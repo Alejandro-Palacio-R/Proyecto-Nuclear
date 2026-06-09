@@ -423,6 +423,19 @@ nav button:hover{background:var(--primary-soft);border-color:rgba(0,242,255,.45)
   box-shadow:0 12px 28px rgba(0,0,0,.22);
 }
 .item b{color:var(--text)}
+.account-panel{
+  max-width:520px;
+  display:grid;
+  gap:6px;
+}
+.account-panel input{
+  width:100%;
+  margin-left:0;
+}
+.account-panel button{
+  width:max-content;
+  margin-left:0;
+}
 .case-actions{display:grid;grid-template-columns:auto auto auto minmax(260px,1fr) auto;gap:8px;align-items:start;margin-top:10px}
 .case-actions select{width:100%;margin:6px 0}
 .import-panel{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}

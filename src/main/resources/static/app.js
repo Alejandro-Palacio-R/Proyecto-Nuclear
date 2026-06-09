@@ -77,6 +77,48 @@ function show(title, html) {
   $('output').innerHTML = `<h3>${title}</h3>${html}`;
 }
 
+function showAccount() {
+  show('Cuenta', `<div class="account-panel">
+    <p>Actualiza tu contrasena ingresando primero la contrasena actual.</p>
+    <label class="field-label" for="currentPassword">Contrasena actual</label>
+    <input id="currentPassword" type="password" autocomplete="current-password">
+    <label class="field-label" for="newPassword">Nueva contrasena</label>
+    <input id="newPassword" type="password" autocomplete="new-password" minlength="6">
+    <label class="field-label" for="confirmPassword">Confirmar nueva contrasena</label>
+    <input id="confirmPassword" type="password" autocomplete="new-password" minlength="6">
+    <button onclick="changePassword()">Cambiar contrasena</button>
+    <pre id="accountMsg"></pre>
+  </div>`);
+}
+
+async function changePassword() {
+  const currentPassword = $('currentPassword').value;
+  const newPassword = $('newPassword').value;
+  const confirmPassword = $('confirmPassword').value;
+  const msg = $('accountMsg');
+  msg.textContent = '';
+  if (newPassword.length < 6) {
+    msg.textContent = 'La nueva contrasena debe tener al menos 6 caracteres.';
+    return;
+  }
+  if (newPassword !== confirmPassword) {
+    msg.textContent = 'La confirmacion no coincide con la nueva contrasena.';
+    return;
+  }
+  try {
+    const r = await api('/api/account/password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
+    $('currentPassword').value = '';
+    $('newPassword').value = '';
+    $('confirmPassword').value = '';
+    msg.textContent = r.message || 'Contrasena actualizada.';
+  } catch (e) {
+    msg.textContent = e.message;
+  }
+}
+
 async function runView(title, loader) {
   try {
     show(title, '<p>Cargando...</p>');
