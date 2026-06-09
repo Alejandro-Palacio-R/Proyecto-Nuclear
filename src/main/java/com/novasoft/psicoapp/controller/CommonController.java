@@ -1,0 +1,3 @@
+package com.novasoft.psicoapp.controller;
+import com.novasoft.psicoapp.model.*; import com.novasoft.psicoapp.repo.*; import com.novasoft.psicoapp.service.CurrentUser; import org.springframework.web.bind.annotation.*; import java.util.*;
+@RestController @RequestMapping("/api") public class CommonController{ private final CurrentUser current; private final NotificationRepo notifications; public CommonController(CurrentUser c,NotificationRepo n){current=c;notifications=n;} @GetMapping("/me") public User me(){return current.get();} @GetMapping("/notifications") public List<Notification> notifications(){return notifications.findByUserIdOrderByCreatedAtDesc(current.get().id);} }

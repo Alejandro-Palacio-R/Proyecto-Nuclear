@@ -1,0 +1,64 @@
+{
+  "cases": [
+    {
+      "title": "Caso importado: Toma de decisiones en grupo",
+      "category": "Psicologia social",
+      "difficulty": "Media",
+      "description": "Un equipo debe decidir como actuar frente a presion social y conflicto de roles.",
+      "blocks": [
+        {
+          "type": "TEXT",
+          "title": "Contexto inicial",
+          "text": "Lee la situacion y escribe que variables sociales identificas."
+        },
+        {
+          "type": "QUESTION",
+          "title": "Decision inicial",
+          "question": "Cual seria la primera accion profesional mas adecuada?",
+          "score": 10,
+          "options": [
+            {
+              "text": "Escuchar a las partes y recopilar informacion",
+              "correct": true,
+              "justification": "Permite comprender el contexto antes de intervenir."
+            },
+            {
+              "text": "Tomar partido por la persona con mas liderazgo",
+              "correct": false,
+              "justification": "Aumenta el sesgo y puede escalar el conflicto."
+            },
+            {
+              "text": "Ignorar la situacion hasta que el grupo se calme",
+              "correct": false,
+              "justification": "Puede normalizar el problema."
+            }
+          ]
+        },
+        {
+          "type": "QUESTION",
+          "title": "Factores de influencia",
+          "question": "Que factores pueden explicar la conducta del grupo?",
+          "score": 10,
+          "options": [
+            {
+              "text": "Conformidad",
+              "correct": true
+            },
+            {
+              "text": "Presion social",
+              "correct": true
+            },
+            {
+              "text": "Azar biologico sin contexto",
+              "correct": false
+            },
+            {
+              "text": "Roles grupales",
+              "correct": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

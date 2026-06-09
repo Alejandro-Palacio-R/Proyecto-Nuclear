@@ -1,0 +1,2 @@
+package com.novasoft.psicoapp.model; import jakarta.persistence.*; import java.time.*; import java.util.*;
+@Entity public class GameSession{ @Id @GeneratedValue(strategy=GenerationType.IDENTITY) public Long id; @Column(unique=true) public String pin; public String status="ESPERA"; public Integer durationMinutes=30; public LocalDateTime startedAt; public LocalDateTime endsAt; @ManyToOne public CaseStudy caseStudy; @ManyToOne public User professor; @ManyToMany public Set<User> participants=new HashSet<>(); public LocalDateTime createdAt=LocalDateTime.now(); }

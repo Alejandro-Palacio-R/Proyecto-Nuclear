@@ -1,0 +1,1 @@
+package com.novasoft.psicoapp.repo; import com.novasoft.psicoapp.model.StudyGroup; import org.springframework.data.jpa.repository.*; public interface GroupRepo extends JpaRepository<StudyGroup,Long>{}

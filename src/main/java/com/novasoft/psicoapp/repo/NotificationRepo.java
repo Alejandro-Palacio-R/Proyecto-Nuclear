@@ -1,0 +1,1 @@
+package com.novasoft.psicoapp.repo; import com.novasoft.psicoapp.model.Notification; import org.springframework.data.jpa.repository.*; import java.util.*; public interface NotificationRepo extends JpaRepository<Notification,Long>{ List<Notification> findByUserIdOrderByCreatedAtDesc(Long id); }

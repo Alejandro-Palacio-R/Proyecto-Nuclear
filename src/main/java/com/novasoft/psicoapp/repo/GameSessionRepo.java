@@ -1,0 +1,1 @@
+package com.novasoft.psicoapp.repo; import com.novasoft.psicoapp.model.GameSession; import org.springframework.data.jpa.repository.*; import java.util.*; public interface GameSessionRepo extends JpaRepository<GameSession,Long>{ Optional<GameSession> findByPin(String pin); }

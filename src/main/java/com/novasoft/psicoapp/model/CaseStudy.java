@@ -1,0 +1,2 @@
+package com.novasoft.psicoapp.model; import jakarta.persistence.*; import java.time.*;
+@Entity public class CaseStudy{ @Id @GeneratedValue(strategy=GenerationType.IDENTITY) public Long id; public String title; @Column(length=4000) public String description; public String category; public String difficulty; public boolean active=true; public LocalDateTime createdAt=LocalDateTime.now(); @ManyToOne public User professor; }

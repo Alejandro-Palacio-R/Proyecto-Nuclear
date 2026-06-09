@@ -1,0 +1,2 @@
+package com.novasoft.psicoapp.model; import jakarta.persistence.*; import java.time.*;
+@Entity public class StudentAnswer{ @Id @GeneratedValue(strategy=GenerationType.IDENTITY) public Long id; @ManyToOne public Submission submission; @ManyToOne public Question question; @ManyToOne public AnswerOption selectedOption; public boolean correct; public int points; public LocalDateTime answeredAt=LocalDateTime.now(); }

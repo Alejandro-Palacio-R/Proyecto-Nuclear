@@ -1,0 +1,1 @@
+package com.novasoft.psicoapp.repo; import com.novasoft.psicoapp.model.CaseStudy; import org.springframework.data.jpa.repository.*; import java.util.*; public interface CaseRepo extends JpaRepository<CaseStudy,Long>{ List<CaseStudy> findByActiveTrue(); }

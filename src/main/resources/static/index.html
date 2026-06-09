@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PsicoApp MVP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&family=Material+Symbols+Outlined:wght@300..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="auth-shell">
+<main>
+  <section id="login" class="login-page">
+    <header class="login-brandbar">
+      <div class="brand-mark">
+        <span class="material-symbols-outlined">psychology</span>
+      </div>
+      <strong>PsicoApp</strong>
+    </header>
+
+    <div class="login-grid">
+      <section class="login-identity" aria-label="Bienvenida">
+        <div class="lab-visual" aria-hidden="true">
+          <div class="lab-screen">
+            <span class="material-symbols-outlined brain-icon">psychology</span>
+            <div class="scan-line"></div>
+          </div>
+        </div>
+        <div class="lab-badge">
+          <span class="material-symbols-outlined">terminal</span>
+          <span>Psychosocial Intelligence Lab</span>
+        </div>
+        <div class="login-copy">
+          <h1>Bienvenido a <span>PsicoApp</span></h1>
+          <p>Explora la psicologia social mediante casos narrativos, seguimiento academico y desafios de toma de decisiones.</p>
+        </div>
+        <div class="login-metrics" aria-label="Metricas de la plataforma">
+          <div><small>CURSOS</small><strong>24+</strong></div>
+          <div><small>ESTUDIANTES</small><strong>12k</strong></div>
+          <div><small>LOGROS</small><strong>150</strong></div>
+        </div>
+      </section>
+
+      <section class="login-card" aria-label="Ingreso">
+        <div class="login-card-head">
+          <span class="material-symbols-outlined">encrypted</span>
+          <div>
+            <h2>Ingreso</h2>
+            <p>Acceso al simulador academico</p>
+          </div>
+        </div>
+        <label class="field-label" for="email">Correo</label>
+        <input id="email" placeholder="admin@psicoapp.com" autocomplete="email">
+        <label class="field-label" for="password">Clave</label>
+        <input id="password" placeholder="123456" type="password" autocomplete="current-password">
+        <button class="login-submit" onclick="login()">
+          Entrar
+          <span class="material-symbols-outlined">bolt</span>
+        </button>
+        <p class="demo-users">Usuarios demo: admin@psicoapp.com / profesor@psicoapp.com / estudiante@psicoapp.com. Clave: 123456</p>
+      </section>
+    </div>
+    <pre id="loginMsg"></pre>
+  </section>
+
+  <section id="app" class="hidden">
+    <div class="top">
+      <h2 id="welcome"></h2>
+      <button onclick="logout()">Salir</button>
+    </div>
+
+    <nav>
+      <button type="button" onclick="runView('Casos', loadCases)">Casos</button>
+      <button type="button" onclick="runView('Mis asignaciones', loadAssignments)">Mis asignaciones</button>
+      <button type="button" onclick="runView('Entregas', loadSubmissions)">Entregas</button>
+      <button type="button" onclick="runView('Ranking', loadRanking)">Ranking</button>
+      <button type="button" onclick="runView('Notificaciones', loadNotifications)">Notificaciones</button>
+      <button type="button" id="adminBtn" onclick="runView('Usuarios', loadUsers)">Usuarios</button>
+    </nav>
+
+    <section id="output" class="card"></section>
+
+    <div id="adminPanel" class="card hidden">
+      <h3>Crear usuario</h3>
+      <input id="uName" placeholder="Nombre">
+      <input id="uEmail" placeholder="Email">
+      <select id="uRole">
+        <option>ESTUDIANTE</option>
+        <option>PROFESOR</option>
+        <option>ADMIN</option>
+      </select>
+      <input id="uPass" placeholder="Clave" value="123456">
+      <button onclick="createUser()">Crear</button>
+    </div>
+
+    <div id="teacherPanel" class="card hidden">
+      <h3>Crear caso</h3>
+      <input id="caseTitle" placeholder="Titulo">
+      <input id="caseCategory" placeholder="Categoria">
+      <select id="caseDifficulty">
+        <option>Baja</option>
+        <option>Media</option>
+        <option>Alta</option>
+      </select>
+      <textarea id="caseDesc" placeholder="Descripcion"></textarea>
+      <button onclick="createCase()">Crear caso</button>
+
+      <div class="import-panel">
+        <h3>Importar casos</h3>
+        <div class="import-actions">
+          <button onclick="downloadCaseImportTemplate()">Descargar plantilla</button>
+          <button class="secondary-btn" onclick="fillCaseImportTemplate()">Usar ejemplo</button>
+          <input id="caseImportFile" type="file" accept=".txt,text/plain,application/json,.json" onchange="loadCaseImportFile(event)">
+        </div>
+        <textarea id="caseImportJson" class="import-textarea" placeholder="Pega aqui la plantilla en texto natural"></textarea>
+        <button onclick="importCases()">Importar casos</button>
+        <pre id="importMsg"></pre>
+      </div>
+
+      <h3>Crear sesion de juego</h3>
+      <select id="sessionCaseId">
+        <option value="">Cargando casos...</option>
+      </select>
+      <input id="sessionDuration" type="number" min="1" value="30" placeholder="Minutos">
+      <button onclick="createSession()">Generar PIN</button>
+      <pre id="pinOut"></pre>
+      <div id="hostSessionOut"></div>
+    </div>
+
+    <div id="studentPanel" class="card hidden">
+      <h3>Unirse a sesion en vivo</h3>
+      <input id="joinPin" placeholder="PIN de 6 digitos">
+      <button onclick="joinLiveSession()">Entrar con PIN</button>
+      <pre id="joinOut"></pre>
+    </div>
+  </section>
+</main>
+<script src="/app.js"></script>
+</body>
+</html>

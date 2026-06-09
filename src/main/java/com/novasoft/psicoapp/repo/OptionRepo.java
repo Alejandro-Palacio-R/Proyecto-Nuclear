@@ -1,0 +1,1 @@
+package com.novasoft.psicoapp.repo; import com.novasoft.psicoapp.model.AnswerOption; import org.springframework.data.jpa.repository.*; import java.util.*; public interface OptionRepo extends JpaRepository<AnswerOption,Long>{ List<AnswerOption> findByQuestionId(Long id); List<AnswerOption> findByQuestionIdOrderByIdAsc(Long id); }

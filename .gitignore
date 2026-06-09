@@ -1,0 +1,25 @@
+﻿# Build outputs
+target/
+build/
+out/
+
+# IDE/editor files
+.idea/
+*.iml
+.vscode/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker/local volumes
+.docker/

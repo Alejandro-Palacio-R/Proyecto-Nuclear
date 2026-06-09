@@ -1,0 +1,1 @@
+package com.novasoft.psicoapp.repo; import com.novasoft.psicoapp.model.Question; import org.springframework.data.jpa.repository.*; import java.util.*; public interface QuestionRepo extends JpaRepository<Question,Long>{ List<Question> findByScenarioIdOrderByOrderIndexAsc(Long id); }

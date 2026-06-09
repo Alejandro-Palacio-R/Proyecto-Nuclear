@@ -1,0 +1,1 @@
+package com.novasoft.psicoapp.repo; import com.novasoft.psicoapp.model.Scenario; import org.springframework.data.jpa.repository.*; import java.util.*; public interface ScenarioRepo extends JpaRepository<Scenario,Long>{ List<Scenario> findByCaseStudyId(Long id); List<Scenario> findByCaseStudyIdOrderByOrderIndexAsc(Long id); }

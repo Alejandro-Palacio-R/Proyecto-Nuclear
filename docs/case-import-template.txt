@@ -1,0 +1,26 @@
+CASO: Toma de decisiones en grupo
+CATEGORIA: Psicologia social
+DIFICULTAD: Media
+DESCRIPCION:
+Un equipo debe decidir como actuar frente a presion social y conflicto de roles.
+
+---
+TEXTO: Contexto inicial
+Lee la situacion y escribe que variables sociales identificas.
+
+---
+PREGUNTA: Cual seria la primera accion profesional mas adecuada?
+PUNTAJE: 10
+OPCIONES:
+- [correcta] Escuchar a las partes y recopilar informacion
+- Tomar partido por la persona con mas liderazgo
+- Ignorar la situacion hasta que el grupo se calme
+
+---
+PREGUNTA: Que factores pueden explicar la conducta del grupo?
+PUNTAJE: 10
+OPCIONES:
+- [correcta] Conformidad
+- [correcta] Presion social
+- Azar biologico sin contexto
+- [correcta] Roles grupales
