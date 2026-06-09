@@ -62,8 +62,9 @@ async function boot() {
     $('login').classList.add('hidden');
     $('app').classList.remove('hidden');
     document.body.classList.remove('auth-shell');
-    $('welcome').textContent = `Hola, ${me.name} (${me.role})`;
-    $('adminBtn').style.display = me.role === 'ADMIN' ? 'inline-block' : 'none';
+    $('welcome').textContent = me.name || me.email;
+    $('roleBadge').textContent = me.role;
+    $('adminBtn').style.display = me.role === 'ADMIN' ? 'flex' : 'none';
     $('adminPanel').classList.toggle('hidden', me.role !== 'ADMIN');
     $('teacherPanel').classList.toggle('hidden', !(me.role === 'PROFESOR' || me.role === 'ADMIN'));
     $('studentPanel').classList.toggle('hidden', me.role !== 'ESTUDIANTE');
@@ -73,8 +74,31 @@ async function boot() {
   }
 }
 
+function setActiveNav(btn) {
+  document.querySelectorAll('.side-nav button').forEach(b => b.classList.remove('active'));
+  btn?.classList.add('active');
+}
+
+function pageHint(title) {
+  const hints = {
+    'Casos': 'Explora casos, disena pantallas y asigna estudiantes desde tarjetas de trabajo.',
+    'Mis asignaciones': 'Continua los casos asignados y revisa que actividades tienes pendientes.',
+    'Entregas': 'Consulta entregas, puntajes y retroalimentacion del proceso.',
+    'Ranking': 'Compara desempeno por caso y detecta avances destacados.',
+    'Notificaciones': 'Revisa avisos academicos y actualizaciones recientes.',
+    'Cuenta': 'Administra tu acceso y seguridad personal.',
+    'Usuarios': 'Gestiona usuarios y roles de la plataforma.',
+    'Constructor del caso': 'Ordena la experiencia paso a paso como una simulacion guiada.',
+    'Resolver caso': 'Avanza por la simulacion, revisa el historial y registra tus decisiones.',
+    'Sala en vivo': 'Monitorea participantes y tiempo de la sesion sincronizada.'
+  };
+  return hints[title] || 'Trabaja sobre la informacion seleccionada.';
+}
+
 function show(title, html) {
-  $('output').innerHTML = `<h3>${title}</h3>${html}`;
+  if ($('pageTitle')) $('pageTitle').textContent = title;
+  if ($('pageHint')) $('pageHint').textContent = pageHint(title);
+  $('output').innerHTML = `<div class="section-head"><div><span class="eyebrow">Modulo</span><h3>${title}</h3></div></div>${html}`;
 }
 
 function showAccount() {
@@ -149,17 +173,22 @@ async function loadCases() {
   const rows = await api('/api/cases');
   if (me.role !== 'ESTUDIANTE') updateSessionCaseOptions(rows);
   if (me.role !== 'ESTUDIANTE') await loadStudents();
-  show('Casos', rows.map(c => `<div class=item>
-    <b>#${c.id} ${c.title}</b> <span class=badge>${c.difficulty || ''}</span>
-    <p>${c.description || ''}</p><small>${c.category || ''}</small>
+  show('Casos', `<div class="case-grid">${rows.map(c => `<article class="case-card">
+    <div class="case-card-top">
+      <span class="case-id">#${c.id}</span>
+      <span class=badge>${esc(c.difficulty || 'Sin dificultad')}</span>
+    </div>
+    <h4>${esc(c.title)}</h4>
+    <p>${esc(c.description || 'Sin descripcion')}</p>
+    <small>${esc(c.category || 'Sin categoria')}</small>
     ${me.role !== 'ESTUDIANTE' ? `<div class="case-actions">
-      <button onclick="openBuilder(${c.id})">Diseñar bloques</button>
+      <button onclick="openBuilder(${c.id})">Disenar bloques</button>
       ${me.role === 'ADMIN' ? `<button onclick="startCaseAsAdmin(${c.id})">Resolver caso</button>` : ''}
       <button class="danger-btn" onclick="deleteCase(${c.id})">Borrar caso</button>
       <select id="assign${c.id}" multiple size="5">${studentOptions()}</select>
       <button onclick="assignStudents(${c.id})">Asignar seleccionados</button>
     </div>` : ''}
-  </div>`).join('') || 'Sin casos');
+  </article>`).join('') || '<div class="empty-state"><span class="material-symbols-outlined">folder_off</span><h4>Sin casos todavia</h4><p>Crea o importa el primer caso desde el panel de acciones.</p></div>'}</div>`);
 }
 
 async function createCase() {

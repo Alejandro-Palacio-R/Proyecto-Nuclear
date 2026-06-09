@@ -64,76 +64,138 @@
     <pre id="loginMsg"></pre>
   </section>
 
-  <section id="app" class="hidden">
-    <div class="top">
-      <h2 id="welcome"></h2>
-      <button onclick="logout()">Salir</button>
-    </div>
-
-    <nav>
-      <button type="button" onclick="runView('Casos', loadCases)">Casos</button>
-      <button type="button" onclick="runView('Mis asignaciones', loadAssignments)">Mis asignaciones</button>
-      <button type="button" onclick="runView('Entregas', loadSubmissions)">Entregas</button>
-      <button type="button" onclick="runView('Ranking', loadRanking)">Ranking</button>
-      <button type="button" onclick="runView('Notificaciones', loadNotifications)">Notificaciones</button>
-      <button type="button" onclick="showAccount()">Cuenta</button>
-      <button type="button" id="adminBtn" onclick="runView('Usuarios', loadUsers)">Usuarios</button>
-    </nav>
-
-    <section id="output" class="card"></section>
-
-    <div id="adminPanel" class="card hidden">
-      <h3>Crear usuario</h3>
-      <input id="uName" placeholder="Nombre">
-      <input id="uEmail" placeholder="Email">
-      <select id="uRole">
-        <option>ESTUDIANTE</option>
-        <option>PROFESOR</option>
-        <option>ADMIN</option>
-      </select>
-      <input id="uPass" placeholder="Clave" value="123456">
-      <button onclick="createUser()">Crear</button>
-    </div>
-
-    <div id="teacherPanel" class="card hidden">
-      <h3>Crear caso</h3>
-      <input id="caseTitle" placeholder="Titulo">
-      <input id="caseCategory" placeholder="Categoria">
-      <select id="caseDifficulty">
-        <option>Baja</option>
-        <option>Media</option>
-        <option>Alta</option>
-      </select>
-      <textarea id="caseDesc" placeholder="Descripcion"></textarea>
-      <button onclick="createCase()">Crear caso</button>
-
-      <div class="import-panel">
-        <h3>Importar casos</h3>
-        <div class="import-actions">
-          <button onclick="downloadCaseImportTemplate()">Descargar plantilla</button>
-          <button class="secondary-btn" onclick="fillCaseImportTemplate()">Usar ejemplo</button>
-          <input id="caseImportFile" type="file" accept=".txt,text/plain,application/json,.json" onchange="loadCaseImportFile(event)">
+  <section id="app" class="app-shell hidden">
+    <aside class="sidebar" aria-label="Menu principal">
+      <div class="sidebar-brand">
+        <div class="brand-mark">
+          <span class="material-symbols-outlined">psychology</span>
         </div>
-        <textarea id="caseImportJson" class="import-textarea" placeholder="Pega aqui la plantilla en texto natural"></textarea>
-        <button onclick="importCases()">Importar casos</button>
-        <pre id="importMsg"></pre>
+        <div>
+          <strong>PsicoApp</strong>
+          <small>Case Resolution Hub</small>
+        </div>
       </div>
 
-      <h3>Crear sesion de juego</h3>
-      <select id="sessionCaseId">
-        <option value="">Cargando casos...</option>
-      </select>
-      <input id="sessionDuration" type="number" min="1" value="30" placeholder="Minutos">
-      <button onclick="createSession()">Generar PIN</button>
-      <pre id="pinOut"></pre>
-      <div id="hostSessionOut"></div>
-    </div>
+      <div class="profile-card">
+        <span class="material-symbols-outlined">account_circle</span>
+        <div>
+          <small>Sesion activa</small>
+          <b id="welcome"></b>
+        </div>
+      </div>
 
-    <div id="studentPanel" class="card hidden">
-      <h3>Unirse a sesion en vivo</h3>
-      <input id="joinPin" placeholder="PIN de 6 digitos">
-      <button onclick="joinLiveSession()">Entrar con PIN</button>
-      <pre id="joinOut"></pre>
+      <nav class="side-nav">
+        <button type="button" class="active" data-view="casos" onclick="setActiveNav(this); runView('Casos', loadCases)">
+          <span class="material-symbols-outlined">folder_open</span>
+          <span>Casos</span>
+        </button>
+        <button type="button" data-view="asignaciones" onclick="setActiveNav(this); runView('Mis asignaciones', loadAssignments)">
+          <span class="material-symbols-outlined">assignment</span>
+          <span>Mis asignaciones</span>
+        </button>
+        <button type="button" data-view="entregas" onclick="setActiveNav(this); runView('Entregas', loadSubmissions)">
+          <span class="material-symbols-outlined">rate_review</span>
+          <span>Entregas</span>
+        </button>
+        <button type="button" data-view="ranking" onclick="setActiveNav(this); runView('Ranking', loadRanking)">
+          <span class="material-symbols-outlined">leaderboard</span>
+          <span>Ranking</span>
+        </button>
+        <button type="button" data-view="notificaciones" onclick="setActiveNav(this); runView('Notificaciones', loadNotifications)">
+          <span class="material-symbols-outlined">notifications</span>
+          <span>Notificaciones</span>
+        </button>
+        <button type="button" data-view="cuenta" onclick="setActiveNav(this); showAccount()">
+          <span class="material-symbols-outlined">manage_accounts</span>
+          <span>Cuenta</span>
+        </button>
+        <button type="button" id="adminBtn" data-view="usuarios" onclick="setActiveNav(this); runView('Usuarios', loadUsers)">
+          <span class="material-symbols-outlined">groups</span>
+          <span>Usuarios</span>
+        </button>
+      </nav>
+
+      <button class="logout-btn" onclick="logout()">
+        <span class="material-symbols-outlined">logout</span>
+        Salir
+      </button>
+    </aside>
+
+    <div class="workspace">
+      <header class="workspace-top">
+        <div>
+          <span class="eyebrow">Panel de trabajo</span>
+          <h2 id="pageTitle">Casos</h2>
+          <p id="pageHint">Selecciona, crea o resuelve casos desde un mismo lugar.</p>
+        </div>
+        <div class="status-pill">
+          <span class="material-symbols-outlined">verified_user</span>
+          <span id="roleBadge"></span>
+        </div>
+      </header>
+
+      <section class="workspace-grid">
+        <section id="output" class="card output-card"></section>
+
+        <aside class="action-rail" aria-label="Acciones rapidas">
+          <div id="studentPanel" class="rail-card hidden">
+            <h3>Sesion en vivo</h3>
+            <p>Ingresa el PIN del profesor para entrar al caso sincronizado.</p>
+            <input id="joinPin" placeholder="PIN de 6 digitos">
+            <button onclick="joinLiveSession()">Entrar con PIN</button>
+            <pre id="joinOut"></pre>
+          </div>
+
+          <div id="teacherPanel" class="rail-card hidden">
+            <h3>Crear caso</h3>
+            <input id="caseTitle" placeholder="Titulo">
+            <input id="caseCategory" placeholder="Categoria">
+            <select id="caseDifficulty">
+              <option>Baja</option>
+              <option>Media</option>
+              <option>Alta</option>
+            </select>
+            <textarea id="caseDesc" placeholder="Descripcion"></textarea>
+            <button onclick="createCase()">Crear caso</button>
+
+            <div class="import-panel">
+              <h3>Importar casos</h3>
+              <div class="import-actions">
+                <button onclick="downloadCaseImportTemplate()">Descargar plantilla</button>
+                <button class="secondary-btn" onclick="fillCaseImportTemplate()">Usar ejemplo</button>
+                <input id="caseImportFile" type="file" accept=".txt,text/plain,application/json,.json" onchange="loadCaseImportFile(event)">
+              </div>
+              <textarea id="caseImportJson" class="import-textarea" placeholder="Pega aqui la plantilla en texto natural"></textarea>
+              <button onclick="importCases()">Importar casos</button>
+              <pre id="importMsg"></pre>
+            </div>
+
+            <div class="live-panel">
+              <h3>Sesion de juego</h3>
+              <select id="sessionCaseId">
+                <option value="">Cargando casos...</option>
+              </select>
+              <input id="sessionDuration" type="number" min="1" value="30" placeholder="Minutos">
+              <button onclick="createSession()">Generar PIN</button>
+              <pre id="pinOut"></pre>
+              <div id="hostSessionOut"></div>
+            </div>
+          </div>
+
+          <div id="adminPanel" class="rail-card hidden">
+            <h3>Crear usuario</h3>
+            <input id="uName" placeholder="Nombre">
+            <input id="uEmail" placeholder="Email">
+            <select id="uRole">
+              <option>ESTUDIANTE</option>
+              <option>PROFESOR</option>
+              <option>ADMIN</option>
+            </select>
+            <input id="uPass" placeholder="Clave" value="123456">
+            <button onclick="createUser()">Crear</button>
+          </div>
+        </aside>
+      </section>
     </div>
   </section>
 </main>
