@@ -26,6 +26,14 @@ public class CaseController {
 
   @GetMapping
   public List<CaseStudy> all() {
+    User me = current.get();
+    if (me.role == Role.ESTUDIANTE) {
+      return assignments.findByStudentId(me.id).stream()
+        .map(a -> a.caseStudy)
+        .filter(c -> c != null && c.active)
+        .distinct()
+        .toList();
+    }
     return cases.findByActiveTrue();
   }
 
@@ -103,6 +111,7 @@ public class CaseController {
 
   @GetMapping("/{id}/blocks")
   public List<Map<String, Object>> blocks(@PathVariable Long id) {
+    requireCaseAccess(id);
     return scenarios.findByCaseStudyIdOrderByOrderIndexAsc(id).stream().map(this::blockDto).toList();
   }
 
@@ -306,14 +315,16 @@ public class CaseController {
 
   @PostMapping("/{id}/assign-students")
   @PreAuthorize("hasAnyRole('PROFESOR','ADMIN')")
-  public List<Map<String, Object>> assignStudents(@PathVariable Long id, @RequestBody Map<String, List<Long>> body) {
+  public List<Map<String, Object>> assignStudents(@PathVariable Long id, @RequestBody Map<String, Object> body) {
     CaseStudy cs = cases.findById(id).orElseThrow();
+    int maxAttempts = Math.max(1, intValue(body.get("maxAttempts"), 1));
     List<Map<String, Object>> out = new ArrayList<>();
-    for (Long studentId : body.getOrDefault("studentIds", List.of())) {
+    for (Long studentId : longList(body.get("studentIds"))) {
       User student = users.findById(studentId).orElseThrow();
       if (student.role != Role.ESTUDIANTE) throw new IllegalArgumentException("El usuario " + studentId + " no es estudiante");
       Assignment a = new Assignment();
       a.caseStudy = cs; a.student = student;
+      a.maxAttempts = maxAttempts;
       Assignment saved = assignments.save(a);
       Map<String, Object> m = studentDto(student);
       m.put("assignmentId", saved.id);
@@ -553,5 +564,17 @@ public class CaseController {
   private boolean boolValue(Object value) {
     if (value instanceof Boolean b) return b;
     return value != null && Boolean.parseBoolean(value.toString());
+  }
+
+  private void requireCaseAccess(Long caseId) {
+    User me = current.get();
+    if (me.role != Role.ESTUDIANTE) return;
+    boolean assigned = assignments.findByStudentIdAndCaseStudyId(me.id, caseId).stream().anyMatch(a -> a.caseStudy != null && a.caseStudy.active);
+    if (!assigned) throw new SecurityException("No tienes permiso para ver este caso");
+  }
+
+  private List<Long> longList(Object value) {
+    if (!(value instanceof List<?> list)) return List.of();
+    return list.stream().map(v -> v instanceof Number n ? n.longValue() : Long.parseLong(v.toString())).toList();
   }
 }

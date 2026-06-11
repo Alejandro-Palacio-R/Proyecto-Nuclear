@@ -13,9 +13,10 @@ import java.util.*;
 public class TeacherController {
   private final SubmissionRepo submissions;
   private final NotificationRepo notifications;
+  private final AssignmentRepo assignments;
 
-  public TeacherController(SubmissionRepo s, NotificationRepo n) {
-    submissions = s; notifications = n;
+  public TeacherController(SubmissionRepo s, NotificationRepo n, AssignmentRepo a) {
+    submissions = s; notifications = n; assignments = a;
   }
 
   @GetMapping("/submissions")
@@ -39,6 +40,15 @@ public class TeacherController {
     return s;
   }
 
+  @PostMapping("/assignments/{id}/extra-attempts")
+  public Assignment extraAttempts(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+    Assignment a = assignments.findById(id).orElseThrow();
+    int add = intValue(body.get("extraAttempts"), 1);
+    if (add < 1) throw new IllegalArgumentException("Debes agregar al menos 1 intento");
+    a.extraAttempts += add;
+    return assignments.save(a);
+  }
+
   @GetMapping(value = "/export/submissions.csv", produces = "text/csv")
   public ResponseEntity<String> export() {
     StringBuilder sb = new StringBuilder("id,estudiante,caso,estado,puntaje_auto,nota\n");
@@ -46,5 +56,11 @@ public class TeacherController {
       sb.append(s.id).append(',').append(s.student.name).append(',').append(s.assignment.caseStudy.title.replace(",", " ")).append(',').append(s.status).append(',').append(s.autoScore).append(',').append(s.grade == null ? "" : s.grade).append('\n');
     }
     return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=submissions.csv").body(sb.toString());
+  }
+
+  private int intValue(Object value, int fallback) {
+    if (value == null || value.toString().isBlank()) return fallback;
+    if (value instanceof Number n) return n.intValue();
+    return Integer.parseInt(value.toString());
   }
 }

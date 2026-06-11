@@ -1,4 +1,4 @@
-let token = localStorage.getItem('token'), me = null, students = [], sessionCases = [];
+let token = localStorage.getItem('token'), me = null, students = [], sessionCases = [], adminUsers = [];
 let activeBlocks = [], activeAssignment = null, builderBlocks = [];
 let activeGameSession = null, liveSessionTimer = null;
 const $ = id => document.getElementById(id);
@@ -64,10 +64,12 @@ async function boot() {
     document.body.classList.remove('auth-shell');
     $('welcome').textContent = me.name || me.email;
     $('roleBadge').textContent = me.role;
+    const canManageCases = me.role === 'PROFESOR' || me.role === 'ADMIN';
     $('adminBtn').style.display = me.role === 'ADMIN' ? 'flex' : 'none';
-    $('adminPanel').classList.toggle('hidden', me.role !== 'ADMIN');
-    $('teacherPanel').classList.toggle('hidden', !(me.role === 'PROFESOR' || me.role === 'ADMIN'));
-    $('studentPanel').classList.toggle('hidden', me.role !== 'ESTUDIANTE');
+    $('createUserBtn').style.display = me.role === 'ADMIN' ? 'flex' : 'none';
+    $('createCaseBtn').style.display = canManageCases ? 'flex' : 'none';
+    $('createSessionBtn').style.display = canManageCases ? 'flex' : 'none';
+    $('joinSessionBtn').style.display = me.role === 'ESTUDIANTE' ? 'flex' : 'none';
     loadCases();
   } catch (e) {
     localStorage.removeItem('token');
@@ -88,6 +90,10 @@ function pageHint(title) {
     'Notificaciones': 'Revisa avisos academicos y actualizaciones recientes.',
     'Cuenta': 'Administra tu acceso y seguridad personal.',
     'Usuarios': 'Gestiona usuarios y roles de la plataforma.',
+    'Crear caso': 'Define un nuevo caso academico o importa una plantilla estructurada.',
+    'Crear usuario': 'Registra estudiantes, profesores o administradores desde un formulario dedicado.',
+    'Crear sesion': 'Genera una sala en vivo con PIN y tiempo limite para un caso.',
+    'Unirse a sesion': 'Ingresa el PIN de una sala en vivo para resolver el caso con tu grupo.',
     'Constructor del caso': 'Ordena la experiencia paso a paso como una simulacion guiada.',
     'Resolver caso': 'Avanza por la simulacion, revisa el historial y registra tus decisiones.',
     'Sala en vivo': 'Monitorea participantes y tiempo de la sesion sincronizada.'
@@ -143,6 +149,105 @@ async function changePassword() {
   }
 }
 
+function showCreateCase() {
+  show('Crear caso', `<div class="form-page">
+    <section class="form-card">
+      <span class="material-symbols-outlined form-icon">note_add</span>
+      <h4>Nuevo caso academico</h4>
+      <p>Completa la informacion base. Luego podras disenar las pantallas del caso desde el modulo Casos.</p>
+      <label class="field-label" for="caseTitle">Titulo</label>
+      <input id="caseTitle" placeholder="Ej. Presion social en equipos de trabajo">
+      <label class="field-label" for="caseCategory">Categoria</label>
+      <input id="caseCategory" placeholder="Ej. Psicologia social">
+      <label class="field-label" for="caseDifficulty">Dificultad</label>
+      <select id="caseDifficulty">
+        <option>Baja</option>
+        <option>Media</option>
+        <option>Alta</option>
+      </select>
+      <label class="field-label" for="caseDesc">Descripcion</label>
+      <textarea id="caseDesc" placeholder="Resume el contexto y objetivo del caso"></textarea>
+      <button onclick="createCase()">Crear caso</button>
+      <pre id="caseMsg"></pre>
+    </section>
+
+    <section class="form-card">
+      <span class="material-symbols-outlined form-icon">upload_file</span>
+      <h4>Importar casos</h4>
+      <p>Usa una plantilla para cargar casos con textos, preguntas y opciones de respuesta.</p>
+      <div class="import-actions">
+        <button onclick="downloadCaseImportTemplate()">Descargar plantilla</button>
+        <button class="secondary-btn" onclick="fillCaseImportTemplate()">Usar ejemplo</button>
+        <input id="caseImportFile" type="file" accept=".txt,text/plain,application/json,.json" onchange="loadCaseImportFile(event)">
+      </div>
+      <textarea id="caseImportJson" class="import-textarea" placeholder="Pega aqui la plantilla en texto natural"></textarea>
+      <button onclick="importCases()">Importar casos</button>
+      <pre id="importMsg"></pre>
+    </section>
+  </div>`);
+}
+
+async function showCreateSession() {
+  show('Crear sesion', '<p>Cargando casos disponibles...</p>');
+  const cases = await api('/api/cases');
+  updateSessionCaseOptions(cases);
+  const options = cases.length
+    ? `<option value="">Selecciona un caso</option>${cases.map(c => `<option value="${c.id}">#${c.id} ${esc(c.title)}${c.difficulty ? ` - ${esc(c.difficulty)}` : ''}</option>`).join('')}`
+    : '<option value="">No hay casos activos</option>';
+  show('Crear sesion', `<div class="form-page single-form">
+    <section class="form-card">
+      <span class="material-symbols-outlined form-icon">stadia_controller</span>
+      <h4>Nueva sesion en vivo</h4>
+      <p>Selecciona un caso y define el tiempo limite. El sistema generara un PIN para estudiantes.</p>
+      <label class="field-label" for="sessionCaseId">Caso</label>
+      <select id="sessionCaseId">${options}</select>
+      <label class="field-label" for="sessionDuration">Duracion en minutos</label>
+      <input id="sessionDuration" type="number" min="1" value="30" placeholder="Minutos">
+      <button onclick="createSession()">Generar PIN</button>
+      <pre id="pinOut"></pre>
+      <div id="hostSessionOut"></div>
+    </section>
+  </div>`);
+}
+
+function showJoinSession() {
+  show('Unirse a sesion', `<div class="form-page single-form">
+    <section class="form-card">
+      <span class="material-symbols-outlined form-icon">pin</span>
+      <h4>Entrar a una sala en vivo</h4>
+      <p>Ingresa el PIN de 6 digitos entregado por tu profesor.</p>
+      <label class="field-label" for="joinPin">PIN de la sesion</label>
+      <input id="joinPin" placeholder="PIN de 6 digitos">
+      <button onclick="joinLiveSession()">Entrar con PIN</button>
+      <pre id="joinOut"></pre>
+    </section>
+  </div>`);
+}
+
+function showCreateUser() {
+  show('Crear usuario', `<div class="form-page single-form">
+    <section class="form-card">
+      <span class="material-symbols-outlined form-icon">person_add</span>
+      <h4>Nuevo usuario</h4>
+      <p>Crea cuentas para estudiantes, profesores o administradores.</p>
+      <label class="field-label" for="uName">Nombre</label>
+      <input id="uName" placeholder="Nombre">
+      <label class="field-label" for="uEmail">Correo</label>
+      <input id="uEmail" placeholder="Email">
+      <label class="field-label" for="uRole">Rol</label>
+      <select id="uRole">
+        <option>ESTUDIANTE</option>
+        <option>PROFESOR</option>
+        <option>ADMIN</option>
+      </select>
+      <label class="field-label" for="uPass">Clave inicial</label>
+      <input id="uPass" type="password" placeholder="Clave" value="123456">
+      <button onclick="createUser()">Crear usuario</button>
+      <pre id="uMsg"></pre>
+    </section>
+  </div>`);
+}
+
 async function runView(title, loader) {
   try {
     show(title, '<p>Cargando...</p>');
@@ -186,17 +291,28 @@ async function loadCases() {
       ${me.role === 'ADMIN' ? `<button onclick="startCaseAsAdmin(${c.id})">Resolver caso</button>` : ''}
       <button class="danger-btn" onclick="deleteCase(${c.id})">Borrar caso</button>
       <select id="assign${c.id}" multiple size="5">${studentOptions()}</select>
+      <input id="attempts${c.id}" type="number" min="1" value="1" placeholder="Intentos maximos">
       <button onclick="assignStudents(${c.id})">Asignar seleccionados</button>
     </div>` : ''}
-  </article>`).join('') || '<div class="empty-state"><span class="material-symbols-outlined">folder_off</span><h4>Sin casos todavia</h4><p>Crea o importa el primer caso desde el panel de acciones.</p></div>'}</div>`);
+  </article>`).join('') || '<div class="empty-state"><span class="material-symbols-outlined">folder_off</span><h4>Sin casos todavia</h4><p>Crea o importa el primer caso desde el menu Crear caso.</p></div>'}</div>`);
 }
 
 async function createCase() {
-  await api('/api/cases', {
-    method: 'POST',
-    body: JSON.stringify({ title: $('caseTitle').value, description: $('caseDesc').value, category: $('caseCategory').value, difficulty: $('caseDifficulty').value })
-  });
-  loadCases();
+  const msg = $('caseMsg');
+  if (msg) msg.textContent = '';
+  try {
+    await api('/api/cases', {
+      method: 'POST',
+      body: JSON.stringify({ title: $('caseTitle').value, description: $('caseDesc').value, category: $('caseCategory').value, difficulty: $('caseDifficulty').value })
+    });
+    if ($('caseTitle')) $('caseTitle').value = '';
+    if ($('caseCategory')) $('caseCategory').value = '';
+    if ($('caseDesc')) $('caseDesc').value = '';
+    if (msg) msg.textContent = 'Caso creado. Ve a Casos para disenar sus bloques o asignarlo.';
+  } catch (e) {
+    if (msg) msg.textContent = e.message;
+    else throw e;
+  }
 }
 
 async function deleteCase(caseId) {
@@ -258,7 +374,6 @@ async function importCases() {
     }
     $('importMsg').textContent = `Importados: ${imported.map(c => `#${c.caseId} ${c.title} (${c.blocks} bloques)`).join(', ')}`;
     $('caseImportJson').value = '';
-    loadCases();
   } catch (e) {
     $('importMsg').textContent = e.message;
   }
@@ -267,7 +382,8 @@ async function importCases() {
 async function assignStudents(id) {
   const selected = [...$('assign' + id).selectedOptions].map(o => Number(o.value));
   if (!selected.length) { alert('Selecciona al menos un estudiante'); return; }
-  const assigned = await api(`/api/cases/${id}/assign-students`, { method: 'POST', body: JSON.stringify({ studentIds: selected }) });
+  const maxAttempts = Math.max(1, Number($('attempts' + id)?.value || 1));
+  const assigned = await api(`/api/cases/${id}/assign-students`, { method: 'POST', body: JSON.stringify({ studentIds: selected, maxAttempts }) });
   alert(`Asignado a ${assigned.length} estudiante(s)`);
 }
 
@@ -422,8 +538,10 @@ async function loadAssignments() {
   try {
     const rows = await api('/api/student/assignments');
     show('Mis asignaciones', rows.map(a => `<div class=item>
-      <b>#${a.id} ${a.caseStudy.title}</b><p>${a.caseStudy.description}</p>
-      <button onclick="startAssignment(${a.id},${a.caseStudy.id})">Resolver caso</button>
+      <b>#${a.id} ${esc(a.caseStudy.title)}</b><p>${esc(a.caseStudy.description)}</p>
+      <p>Intentos usados: <b>${a.attemptsUsed}</b> / ${a.attemptsAllowed}${a.extraAttempts ? ` (${a.extraAttempts} extra)` : ''}</p>
+      ${a.latestScore !== null && a.latestScore !== undefined ? `<p>Ultimo puntaje: <b>${a.latestScore}</b> | Estado: ${esc(a.latestStatus || '')}</p>` : ''}
+      ${a.canStart ? `<button onclick="startAssignment(${a.id},${a.caseStudy.id})">Resolver caso</button>` : '<span class="badge locked-badge">Intentos agotados</span>'}
     </div>`).join('') || 'Sin asignaciones');
   } catch (e) {
     show('Mis asignaciones', 'Disponible para estudiantes.');
@@ -545,21 +663,54 @@ async function finishAssignment() {
   try {
     await updateLiveProgress(activeBlocks.length, true);
     await saveDraft(activeAssignment, false);
-    await api(`/api/student/assignments/${activeAssignment}/submit`, { method: 'POST', body: JSON.stringify({}) });
-    alert('Entrega enviada');
-    loadSubmissions();
+    const submitted = await api(`/api/student/assignments/${activeAssignment}/submit`, { method: 'POST', body: JSON.stringify({}) });
+    showScoreResult(submitted.autoScore, submitted.attemptNumber, 'Entrega enviada');
   } catch (e) {
     show('Sesion en vivo', `<p class="error-text">No se pudo enviar la entrega.</p><pre>${esc(e.message)}</pre>`);
+  }
+}
+
+function showScoreResult(score, attemptNumber, title = 'Caso finalizado') {
+  show(title, `<div class="score-result">
+    <span class="material-symbols-outlined">military_tech</span>
+    <h4>Puntaje obtenido</h4>
+    <strong>${score ?? 0}</strong>
+    ${attemptNumber ? `<p>Intento ${attemptNumber}</p>` : ''}
+    <button onclick="loadAssignments()">Volver a mis asignaciones</button>
+  </div>`);
+}
+
+async function showCurrentAssignmentScore(title = 'Sesion finalizada') {
+  try {
+    const rows = await api('/api/student/submissions');
+    const latest = rows.filter(s => s.assignment?.id === activeAssignment).sort((a, b) => (b.attemptNumber || 1) - (a.attemptNumber || 1))[0];
+    showScoreResult(latest?.autoScore || 0, latest?.attemptNumber, title);
+  } catch (e) {
+    show(title, '<p>El tiempo de la sesion termino.</p>');
   }
 }
 async function loadSubmissions() {
   const path = me.role === 'ESTUDIANTE' ? '/api/student/submissions' : '/api/teacher/submissions';
   const rows = await api(path);
-  show('Entregas', rows.map(s => `<div class=item><b>#${s.id} ${s.student?.name || ''}</b><p>${s.analysisText || ''}</p><p>Estado: ${s.status} | Puntaje: ${s.autoScore} | Nota: ${s.grade ?? 'sin nota'}</p>${me.role !== 'ESTUDIANTE' ? `<input id="g${s.id}" placeholder="nota"><input id="f${s.id}" placeholder="retroalimentación"><button onclick="grade(${s.id})">Calificar</button>` : `<p>${s.feedback || ''}</p>`}</div>`).join('') || 'Sin entregas');
+  show('Entregas', rows.map(s => `<div class=item>
+    <b>#${s.id} ${esc(s.assignment?.caseStudy?.title || '')}</b>
+    <p>Estudiante: ${esc(s.student?.name || '')} | Intento: ${s.attemptNumber || 1}</p>
+    <p>${esc(s.analysisText || '')}</p>
+    <p>Estado: ${s.status} | Puntaje: <b>${s.autoScore}</b> | Nota: ${s.grade ?? 'sin nota'}</p>
+    ${me.role !== 'ESTUDIANTE' ? `<input id="g${s.id}" placeholder="nota"><input id="f${s.id}" placeholder="retroalimentacion"><button onclick="grade(${s.id})">Calificar</button>
+      <div class="extra-attempt-row"><input id="extra${s.assignment?.id}" type="number" min="1" value="1" placeholder="Intentos extra"><button class="secondary-btn" onclick="grantExtraAttempts(${s.assignment?.id})">Dar intento extra</button></div>` : `<p>${esc(s.feedback || '')}</p>`}
+  </div>`).join('') || 'Sin entregas');
 }
 
 async function grade(id) {
   await api(`/api/teacher/submissions/${id}/grade`, { method: 'PUT', body: JSON.stringify({ grade: $('g' + id).value, feedback: $('f' + id).value }) });
+  loadSubmissions();
+}
+
+async function grantExtraAttempts(assignmentId) {
+  const amount = Math.max(1, Number($('extra' + assignmentId)?.value || 1));
+  await api(`/api/teacher/assignments/${assignmentId}/extra-attempts`, { method: 'POST', body: JSON.stringify({ extraAttempts: amount }) });
+  alert(`Se agregaron ${amount} intento(s) extra.`);
   loadSubmissions();
 }
 
@@ -624,7 +775,8 @@ function sessionStatusLabel(s) {
 function participantList(session) {
   return (session.participants || []).map(p => {
     const progress = p.completed ? 'Finalizo' : `Pantalla ${Number(p.currentBlockIndex || 0) + 1}`;
-    return `<div class=item><b>${esc(p.name || p.email)}</b><p>${esc(p.email)}</p><span class=badge>${progress}</span></div>`;
+    const score = session.status === 'FINALIZADA' || p.completed ? `<p>Puntaje: <b>${p.score ?? 0}</b>${p.attemptNumber ? ` | Intento ${p.attemptNumber}` : ''}</p>` : '';
+    return `<div class=item><b>${esc(p.name || p.email)}</b><p>${esc(p.email)}</p><span class=badge>${progress}</span>${score}</div>`;
   }).join('') || '<p>Aun no hay estudiantes en la sala.</p>';
 }
 
@@ -719,7 +871,7 @@ async function pollStudentSession(sessionId) {
     if (session.status === 'EN_CURSO' && !activeBlocks.length) renderStudentSession(session);
     if (session.status === 'FINALIZADA' || session.remainingSeconds <= 0 && session.status === 'EN_CURSO') {
       stopLiveSessionTimer();
-      show('Sesion finalizada', '<p>El tiempo de la sesion termino.</p>');
+      showCurrentAssignmentScore('Sesion finalizada');
     }
   } catch (e) {
     stopLiveSessionTimer();
@@ -733,14 +885,91 @@ async function loadNotifications() {
 
 async function loadUsers() {
   const rows = await api('/api/admin/users');
-  show('Usuarios', rows.map(u => `<div class=item>#${u.id} <b>${u.name}</b> ${u.email} <span class=badge>${u.role}</span></div>`).join(''));
+  adminUsers = rows;
+  show('Usuarios', `<div class="user-grid">${rows.map(userCard).join('') || '<div class="empty-state"><span class="material-symbols-outlined">group_off</span><h4>Sin usuarios</h4><p>Crea el primer usuario desde el panel lateral.</p></div>'}</div>`);
+}
+
+function roleOptions(selected) {
+  return ['ESTUDIANTE', 'PROFESOR', 'ADMIN'].map(role => `<option value="${role}" ${role === selected ? 'selected' : ''}>${role}</option>`).join('');
+}
+
+function userCard(u) {
+  return `<article class="user-card" id="user${u.id}">
+    <div class="user-card-head">
+      <div>
+        <span class="case-id">#${u.id}</span>
+        <h4>${esc(u.name || 'Sin nombre')}</h4>
+        <p>${esc(u.email)}</p>
+      </div>
+      <span class=badge>${esc(u.role)}</span>
+    </div>
+    <div class="user-meta">
+      <span>${u.enabled ? 'Activo' : 'Inactivo'}</span>
+      <span>Creado: ${esc((u.createdAt || '').replace('T', ' ').slice(0, 16) || 'N/D')}</span>
+    </div>
+    <div class="user-actions">
+      <button class="secondary-btn" onclick="renderEditUser(${u.id})">Editar</button>
+      <button class="danger-btn" onclick="deleteUser(${u.id})">Eliminar</button>
+    </div>
+  </article>`;
+}
+
+function renderEditUser(id) {
+  const user = adminUsers.find(u => u.id === id);
+  const target = $('user' + id);
+  if (!user || !target) return;
+  target.className = 'user-card edit-user-card';
+  target.innerHTML = `<h4>Editar usuario #${id}</h4>
+    <label class="field-label">Nombre</label>
+    <input id="editUserName${id}" value="${esc(user.name || '')}">
+    <label class="field-label">Correo</label>
+    <input id="editUserEmail${id}" value="${esc(user.email || '')}">
+    <label class="field-label">Rol</label>
+    <select id="editUserRole${id}">${roleOptions(user.role)}</select>
+    <label class="check-label user-enabled"><input id="editUserEnabled${id}" type="checkbox" ${user.enabled ? 'checked' : ''}> Usuario activo</label>
+    <label class="field-label">Nueva clave (opcional)</label>
+    <input id="editUserPass${id}" type="password" placeholder="Dejar vacio para conservar la actual">
+    <div class="user-actions">
+      <button class="secondary-btn" onclick="loadUsers()">Cancelar</button>
+      <button onclick="updateUser(${id})">Guardar cambios</button>
+    </div>
+    <pre id="editUserMsg${id}"></pre>`;
+}
+
+async function updateUser(id) {
+  const body = {
+    name: $('editUserName' + id).value.trim(),
+    email: $('editUserEmail' + id).value.trim(),
+    role: $('editUserRole' + id).value,
+    enabled: $('editUserEnabled' + id).checked,
+    password: $('editUserPass' + id).value
+  };
+  try {
+    await api(`/api/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+    await loadUsers();
+  } catch (e) {
+    $('editUserMsg' + id).textContent = e.message;
+  }
+}
+
+async function deleteUser(id) {
+  if (me?.id === id && !confirm('Estas intentando eliminar tu propio usuario. Si continuas podrias perder acceso. Continuar?')) return;
+  if (!confirm('Eliminar este usuario? Esta accion no se puede deshacer.')) return;
+  await api(`/api/admin/users/${id}`, { method: 'DELETE' });
+  await loadUsers();
 }
 
 async function createUser() {
-  await api('/api/admin/users', { method: 'POST', body: JSON.stringify({ name: $('uName').value, email: $('uEmail').value, role: $('uRole').value, password: $('uPass').value }) });
-  loadUsers();
+  $('uMsg').textContent = '';
+  try {
+    await api('/api/admin/users', { method: 'POST', body: JSON.stringify({ name: $('uName').value, email: $('uEmail').value, role: $('uRole').value, password: $('uPass').value }) });
+    $('uName').value = '';
+    $('uEmail').value = '';
+    $('uPass').value = '123456';
+    $('uMsg').textContent = 'Usuario creado. Ve a Usuarios para editarlo o revisar la lista completa.';
+  } catch (e) {
+    $('uMsg').textContent = e.message;
+  }
 }
 
 boot();
-
-

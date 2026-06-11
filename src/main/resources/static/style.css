@@ -499,28 +499,12 @@ button:disabled{opacity:.48;cursor:not-allowed;box-shadow:none;transform:none}
 }
 .workspace-grid{
   display:grid;
-  grid-template-columns:minmax(0,1fr) 360px;
+  grid-template-columns:minmax(0,1fr);
   gap:18px;
   align-items:start;
   margin-top:18px;
 }
 .output-card{min-height:520px;margin:0}
-.action-rail{
-  display:grid;
-  gap:18px;
-  position:sticky;
-  top:28px;
-}
-.rail-card{
-  padding:20px;
-  border:1px solid rgba(185,202,203,.14);
-  border-radius:22px;
-  background:rgba(17,25,26,.82);
-  box-shadow:var(--shadow);
-  backdrop-filter:blur(10px);
-}
-.rail-card h3{margin:0 0 8px}
-.rail-card input,.rail-card select,.rail-card textarea{width:100%;margin-left:0;margin-right:0}
 .section-head{
   display:flex;
   justify-content:space-between;
@@ -531,6 +515,46 @@ button:disabled{opacity:.48;cursor:not-allowed;box-shadow:none;transform:none}
   border-bottom:1px solid var(--line);
 }
 .section-head h3{margin:4px 0 0;font-size:24px}
+.form-page{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+  gap:18px;
+}
+.single-form{
+  grid-template-columns:minmax(0,720px);
+}
+.form-card{
+  position:relative;
+  overflow:hidden;
+  padding:22px;
+  border:1px solid rgba(185,202,203,.14);
+  border-radius:22px;
+  background:
+    radial-gradient(circle at 100% 0%,rgba(0,242,255,.13),transparent 16rem),
+    linear-gradient(145deg,rgba(21,31,32,.96),rgba(10,17,18,.96));
+  box-shadow:0 14px 34px rgba(0,0,0,.24);
+}
+.form-card h4{margin:8px 0 6px;font-size:22px;color:var(--text)}
+.form-card p{margin:0 0 14px}
+.form-card input,
+.form-card select,
+.form-card textarea{
+  width:100%;
+  margin-left:0;
+  margin-right:0;
+}
+.form-card button{margin-left:0}
+.form-icon{
+  width:46px;
+  height:46px;
+  display:grid;
+  place-items:center;
+  border:1px solid rgba(0,242,255,.28);
+  border-radius:14px;
+  color:var(--primary);
+  background:rgba(0,242,255,.08);
+  box-shadow:0 0 22px rgba(0,242,255,.08);
+}
 
 .item{
   border:1px solid var(--line);
@@ -598,6 +622,94 @@ button:disabled{opacity:.48;cursor:not-allowed;box-shadow:none;transform:none}
 }
 .empty-state .material-symbols-outlined{font-size:54px;color:var(--primary)}
 .empty-state h4{margin:0;font-size:22px}
+.user-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:14px;
+}
+.user-card{
+  display:grid;
+  gap:14px;
+  padding:16px;
+  border:1px solid rgba(185,202,203,.14);
+  border-radius:18px;
+  background:linear-gradient(145deg,rgba(21,31,32,.94),rgba(10,17,18,.94));
+  box-shadow:0 12px 28px rgba(0,0,0,.22);
+}
+.user-card-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+.user-card h4{margin:4px 0 2px;color:var(--text);font-size:19px}
+.user-card p{margin:0;word-break:break-word}
+.user-meta{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.user-meta span{
+  padding:6px 9px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  color:var(--muted);
+  background:rgba(11,17,18,.68);
+  font-size:12px;
+  font-weight:800;
+}
+.user-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.edit-user-card input,
+.edit-user-card select{
+  width:100%;
+  margin-left:0;
+}
+.user-enabled{
+  margin:8px 0;
+}
+.locked-badge{
+  width:max-content;
+  background:rgba(255,95,87,.14);
+  color:#ffb4ab;
+}
+.extra-attempt-row{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:10px;
+}
+.extra-attempt-row input{
+  width:160px;
+  margin-left:0;
+}
+.score-result{
+  min-height:360px;
+  display:grid;
+  place-items:center;
+  align-content:center;
+  gap:12px;
+  text-align:center;
+  border:1px solid rgba(0,242,255,.22);
+  border-radius:24px;
+  background:
+    radial-gradient(circle at 50% 18%,rgba(0,242,255,.18),transparent 18rem),
+    linear-gradient(145deg,rgba(21,31,32,.96),rgba(10,17,18,.96));
+}
+.score-result .material-symbols-outlined{
+  color:var(--primary);
+  font-size:64px;
+  filter:drop-shadow(0 0 18px rgba(0,242,255,.36));
+}
+.score-result h4{margin:0;font-size:24px}
+.score-result strong{
+  color:var(--primary);
+  font-size:64px;
+  line-height:1;
+}
 .account-panel{
   max-width:520px;
   display:grid;
@@ -889,7 +1001,6 @@ pre{white-space:pre-wrap;background:#0b1112;color:#dce4e4;padding:12px;border:1p
   .workspace-top{flex-direction:column;border-radius:18px}
   .workspace-top h2{font-size:24px}
   .workspace-grid{grid-template-columns:1fr}
-  .action-rail{position:static}
   .case-grid{grid-template-columns:1fr}
   .case-actions{grid-template-columns:1fr}
   .option-row{grid-template-columns:1fr}

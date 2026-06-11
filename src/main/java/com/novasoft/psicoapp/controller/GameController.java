@@ -146,6 +146,10 @@ public class GameController {
       Assignment a = progressByStudent.get(u.id);
       p.put("currentBlockIndex", a == null ? 0 : a.currentBlockIndex);
       p.put("completed", a != null && a.completed);
+      Submission latest = a == null ? null : submissions.findByAssignmentIdAndStudentIdOrderByAttemptNumberDesc(a.id, u.id).stream().findFirst().orElse(null);
+      p.put("score", latest == null ? null : latest.autoScore);
+      p.put("submissionStatus", latest == null ? null : latest.status);
+      p.put("attemptNumber", latest == null ? null : latest.attemptNumber);
       return p;
     }).toList());
     return m;
