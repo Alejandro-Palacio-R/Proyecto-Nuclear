@@ -28,7 +28,9 @@ public class StudentController {
   @GetMapping("/assignments")
   public List<Map<String, Object>> myAssignments() {
     User me = current.get();
-    return assignments.findByStudentId(me.id).stream().map(a -> assignmentDto(a, me)).toList();
+    return canonicalAssignments(assignments.findByStudentId(me.id), me).stream()
+      .map(a -> assignmentDto(a, me))
+      .toList();
   }
 
   @PostMapping("/cases/{caseId}/start")
@@ -85,6 +87,7 @@ public class StudentController {
     List<AnswerOption> allOptions = options.findByQuestionIdOrderByIdAsc(q.id);
     Set<Long> correctIds = allOptions.stream().filter(o -> o.correct).map(o -> o.id).collect(Collectors.toSet());
     Set<Long> selectedSet = new LinkedHashSet<>(selectedIds);
+    if ("SINGLE".equals(responseMode(q)) && selectedSet.size() != 1) throw new IllegalArgumentException("Selecciona una sola opcion");
     boolean exact = selectedSet.equals(correctIds);
 
     List<StudentAnswer> previous = answers.findBySubmissionIdAndQuestionId(sub.id, q.id);
@@ -179,6 +182,38 @@ public class StudentController {
     return m;
   }
 
+  private List<Assignment> canonicalAssignments(List<Assignment> rows, User me) {
+    Map<Long, Assignment> byCase = new LinkedHashMap<>();
+    for (Assignment row : rows) {
+      if (row.caseStudy == null || row.caseStudy.id == null) continue;
+      byCase.merge(row.caseStudy.id, row, (current, candidate) -> betterAssignment(current, candidate, me));
+    }
+    return new ArrayList<>(byCase.values());
+  }
+
+  private Assignment betterAssignment(Assignment current, Assignment candidate, User me) {
+    Optional<Submission> currentLatest = latestSubmission(current.id, me.id);
+    Optional<Submission> candidateLatest = latestSubmission(candidate.id, me.id);
+    if (candidateLatest.isPresent() && currentLatest.isEmpty()) return candidate;
+    if (candidateLatest.isPresent() && currentLatest.isPresent()) {
+      LocalDateTime candidateTime = submissionTime(candidateLatest.get());
+      LocalDateTime currentTime = submissionTime(currentLatest.get());
+      if (candidateTime.isAfter(currentTime)) return candidate;
+    }
+    if (candidate.completed && !current.completed) return candidate;
+    return current.id != null && candidate.id != null && candidate.id < current.id ? candidate : current;
+  }
+
+  private Optional<Submission> latestSubmission(Long assignmentId, Long studentId) {
+    return submissions.findByAssignmentIdAndStudentIdOrderByAttemptNumberDesc(assignmentId, studentId).stream().findFirst();
+  }
+
+  private LocalDateTime submissionTime(Submission submission) {
+    if (submission.updatedAt != null) return submission.updatedAt;
+    if (submission.submittedAt != null) return submission.submittedAt;
+    return LocalDateTime.MIN;
+  }
+
   private void assertLiveAssignmentOpen(Long assignmentId) {
     Assignment a = assignments.findById(assignmentId).orElseThrow();
     if (a.gameSession == null) return;
@@ -196,5 +231,9 @@ public class StudentController {
   private List<Long> longList(Object value) {
     if (!(value instanceof List<?> list)) return List.of();
     return list.stream().map(v -> v instanceof Number n ? n.longValue() : Long.parseLong(v.toString())).toList();
+  }
+
+  private String responseMode(Question q) {
+    return "SINGLE".equalsIgnoreCase(q.responseMode) ? "SINGLE" : "MULTIPLE";
   }
 }

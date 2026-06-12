@@ -3,6 +3,38 @@ let activeBlocks = [], activeAssignment = null, builderBlocks = [];
 let activeGameSession = null, liveSessionTimer = null;
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const rawMessage = error => {
+  const text = String(error?.message ?? error ?? '').trim();
+  if (!text) return 'No se pudo completar la accion.';
+  try {
+    const parsed = JSON.parse(text);
+    return parsed.error || parsed.message || text;
+  } catch {
+    return text;
+  }
+};
+function naturalError(error) {
+  const text = rawMessage(error);
+  const low = text.toLowerCase();
+  if (low.includes('failed to fetch') || low.includes('connection') || low.includes('conex')) return 'No se pudo conectar con el servidor. Revisa que la aplicacion este activa e intenta de nuevo.';
+  if (low.includes('jwt') || low.includes('token') || low.includes('unauthorized') || low.includes('forbidden')) return 'Tu sesion no es valida o expiro. Vuelve a iniciar sesion.';
+  if (low.includes('bad credentials')) return 'Correo o clave incorrectos.';
+  if (low.includes('unexpected token') || low.includes('json')) return 'El formato del texto no es valido. Revisa la plantilla e intenta de nuevo.';
+  if (low.includes('could not execute') || low.includes('sql') || low.includes('hibernate')) return 'No se pudo guardar la informacion. Revisa los datos e intenta de nuevo.';
+  if (low.includes('no value present') || low.includes('not found')) return 'No encontramos el registro solicitado. Actualiza la pagina e intenta de nuevo.';
+  if (low.includes('duplicate') || low.includes('constraint')) return 'Ya existe un registro con esos datos.';
+  if (text.startsWith('{') || text.startsWith('[')) return 'No se pudo completar la accion. Revisa los datos e intenta de nuevo.';
+  return text;
+}
+function statusBox(id, tone = 'info') {
+  return `<div id="${id}" class="feedback ${tone}" aria-live="polite"></div>`;
+}
+function setStatus(id, message, tone = 'info') {
+  const el = $(id);
+  if (!el) return;
+  el.className = `feedback ${tone}`;
+  el.textContent = message || '';
+}
 const CASE_IMPORT_TEMPLATE = `CASO: Toma de decisiones en grupo
 CATEGORIA: Psicologia social
 DIFICULTAD: Media
@@ -15,6 +47,7 @@ Lee la situacion antes de responder las preguntas siguientes.
 
 ---
 PREGUNTA: Cual seria la primera accion profesional mas adecuada?
+TIPO: unica
 PUNTAJE: 10
 OPCIONES:
 - [correcta] Escuchar a las partes y recopilar informacion
@@ -23,6 +56,7 @@ OPCIONES:
 
 ---
 PREGUNTA: Que factores pueden explicar la conducta del grupo?
+TIPO: multiple
 PUNTAJE: 10
 OPCIONES:
 - [correcta] Conformidad
@@ -34,7 +68,7 @@ async function api(path, opts = {}) {
   opts.headers = { ...(opts.headers || {}), 'Content-Type': 'application/json' };
   if (token) opts.headers.Authorization = 'Bearer ' + token;
   const r = await fetch(path, opts);
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw new Error(naturalError(await r.text()));
   const ct = r.headers.get('content-type') || '';
   return ct.includes('json') ? r.json() : r.text();
 }
@@ -46,7 +80,7 @@ async function login() {
     localStorage.setItem('token', token);
     await boot();
   } catch (e) {
-    $('loginMsg').textContent = e.message;
+    setStatus('loginMsg', naturalError(e), 'error');
   }
 }
 
@@ -117,7 +151,7 @@ function showAccount() {
     <label class="field-label" for="confirmPassword">Confirmar nueva contrasena</label>
     <input id="confirmPassword" type="password" autocomplete="new-password" minlength="6">
     <button onclick="changePassword()">Cambiar contrasena</button>
-    <pre id="accountMsg"></pre>
+    ${statusBox('accountMsg')}
   </div>`);
 }
 
@@ -125,14 +159,13 @@ async function changePassword() {
   const currentPassword = $('currentPassword').value;
   const newPassword = $('newPassword').value;
   const confirmPassword = $('confirmPassword').value;
-  const msg = $('accountMsg');
-  msg.textContent = '';
+  setStatus('accountMsg', '');
   if (newPassword.length < 6) {
-    msg.textContent = 'La nueva contrasena debe tener al menos 6 caracteres.';
+    setStatus('accountMsg', 'La nueva contrasena debe tener al menos 6 caracteres.', 'error');
     return;
   }
   if (newPassword !== confirmPassword) {
-    msg.textContent = 'La confirmacion no coincide con la nueva contrasena.';
+    setStatus('accountMsg', 'La confirmacion no coincide con la nueva contrasena.', 'error');
     return;
   }
   try {
@@ -143,9 +176,9 @@ async function changePassword() {
     $('currentPassword').value = '';
     $('newPassword').value = '';
     $('confirmPassword').value = '';
-    msg.textContent = r.message || 'Contrasena actualizada.';
+    setStatus('accountMsg', r.message || 'Contrasena actualizada.', 'success');
   } catch (e) {
-    msg.textContent = e.message;
+    setStatus('accountMsg', naturalError(e), 'error');
   }
 }
 
@@ -168,7 +201,7 @@ function showCreateCase() {
       <label class="field-label" for="caseDesc">Descripcion</label>
       <textarea id="caseDesc" placeholder="Resume el contexto y objetivo del caso"></textarea>
       <button onclick="createCase()">Crear caso</button>
-      <pre id="caseMsg"></pre>
+      ${statusBox('caseMsg')}
     </section>
 
     <section class="form-card">
@@ -182,7 +215,7 @@ function showCreateCase() {
       </div>
       <textarea id="caseImportJson" class="import-textarea" placeholder="Pega aqui la plantilla en texto natural"></textarea>
       <button onclick="importCases()">Importar casos</button>
-      <pre id="importMsg"></pre>
+      ${statusBox('importMsg')}
     </section>
   </div>`);
 }
@@ -204,7 +237,7 @@ async function showCreateSession() {
       <label class="field-label" for="sessionDuration">Duracion en minutos</label>
       <input id="sessionDuration" type="number" min="1" value="30" placeholder="Minutos">
       <button onclick="createSession()">Generar PIN</button>
-      <pre id="pinOut"></pre>
+      ${statusBox('pinOut')}
       <div id="hostSessionOut"></div>
     </section>
   </div>`);
@@ -219,7 +252,7 @@ function showJoinSession() {
       <label class="field-label" for="joinPin">PIN de la sesion</label>
       <input id="joinPin" placeholder="PIN de 6 digitos">
       <button onclick="joinLiveSession()">Entrar con PIN</button>
-      <pre id="joinOut"></pre>
+      ${statusBox('joinOut')}
     </section>
   </div>`);
 }
@@ -243,7 +276,7 @@ function showCreateUser() {
       <label class="field-label" for="uPass">Clave inicial</label>
       <input id="uPass" type="password" placeholder="Clave" value="123456">
       <button onclick="createUser()">Crear usuario</button>
-      <pre id="uMsg"></pre>
+      ${statusBox('uMsg')}
     </section>
   </div>`);
 }
@@ -253,7 +286,7 @@ async function runView(title, loader) {
     show(title, '<p>Cargando...</p>');
     await loader();
   } catch (e) {
-    show(title, `<p class="error-text">No se pudo cargar esta seccion.</p><pre>${esc(e.message)}</pre>`);
+    show(title, `<div class="feedback error">No se pudo cargar esta seccion. ${esc(naturalError(e))}</div>`);
   }
 }
 
@@ -263,6 +296,21 @@ async function loadStudents() {
 
 function studentOptions() {
   return students.map(s => `<option value="${s.id}">${s.name || s.email} (${s.email})</option>`).join('');
+}
+
+function studentAssignmentList(caseId) {
+  if (!students.length) return '<p class="helper-text">No hay estudiantes disponibles para asignar.</p>';
+  return students.map(s => `<label class="student-pick">
+    <input type="checkbox" value="${s.id}">
+    <span>
+      <b>${esc(s.name || 'Sin nombre')}</b>
+      <small>${esc(s.email)}</small>
+    </span>
+  </label>`).join('');
+}
+
+function toggleCaseStudents(caseId, checked) {
+  document.querySelectorAll(`#assign${caseId} input[type="checkbox"]`).forEach(input => input.checked = checked);
 }
 
 function updateSessionCaseOptions(cases) {
@@ -290,16 +338,31 @@ async function loadCases() {
       <button onclick="openBuilder(${c.id})">Disenar bloques</button>
       ${me.role === 'ADMIN' ? `<button onclick="startCaseAsAdmin(${c.id})">Resolver caso</button>` : ''}
       <button class="danger-btn" onclick="deleteCase(${c.id})">Borrar caso</button>
-      <select id="assign${c.id}" multiple size="5">${studentOptions()}</select>
-      <input id="attempts${c.id}" type="number" min="1" value="1" placeholder="Intentos maximos">
-      <button onclick="assignStudents(${c.id})">Asignar seleccionados</button>
+      <section class="assign-panel" aria-label="Asignar estudiantes">
+        <div class="assign-head">
+          <div>
+            <span class="eyebrow">Asignacion</span>
+            <b>Estudiantes</b>
+          </div>
+          <button class="secondary-btn mini-btn" onclick="toggleCaseStudents(${c.id}, true)">Todos</button>
+        </div>
+        <div id="assign${c.id}" class="student-picker">${studentAssignmentList(c.id)}</div>
+        <div class="assign-controls">
+          <label>
+            <span>Intentos</span>
+            <input id="attempts${c.id}" type="number" min="1" value="1" placeholder="Intentos maximos">
+          </label>
+          <button onclick="assignStudents(${c.id})">Asignar</button>
+        </div>
+        ${statusBox(`assignMsg${c.id}`)}
+      </section>
     </div>` : ''}
   </article>`).join('') || '<div class="empty-state"><span class="material-symbols-outlined">folder_off</span><h4>Sin casos todavia</h4><p>Crea o importa el primer caso desde el menu Crear caso.</p></div>'}</div>`);
 }
 
 async function createCase() {
   const msg = $('caseMsg');
-  if (msg) msg.textContent = '';
+  if (msg) setStatus('caseMsg', '');
   try {
     await api('/api/cases', {
       method: 'POST',
@@ -308,9 +371,9 @@ async function createCase() {
     if ($('caseTitle')) $('caseTitle').value = '';
     if ($('caseCategory')) $('caseCategory').value = '';
     if ($('caseDesc')) $('caseDesc').value = '';
-    if (msg) msg.textContent = 'Caso creado. Ve a Casos para disenar sus bloques o asignarlo.';
+    if (msg) setStatus('caseMsg', 'Caso creado. Ve a Casos para disenar sus bloques o asignarlo.', 'success');
   } catch (e) {
-    if (msg) msg.textContent = e.message;
+    if (msg) setStatus('caseMsg', naturalError(e), 'error');
     else throw e;
   }
 }
@@ -318,7 +381,7 @@ async function createCase() {
 async function deleteCase(caseId) {
   if (!confirm('Borrar este caso? Dejara de aparecer en las listas.')) return;
   await api(`/api/cases/${caseId}`, { method: 'DELETE' });
-  if ($('sessionCaseId')?.value === String(caseId)) $('pinOut').textContent = '';
+  if ($('sessionCaseId')?.value === String(caseId)) setStatus('pinOut', '');
   loadCases();
 }
 
@@ -336,7 +399,7 @@ function caseImportTemplateText() {
 
 function fillCaseImportTemplate() {
   $('caseImportJson').value = caseImportTemplateText();
-  $('importMsg').textContent = '';
+  setStatus('importMsg', '');
 }
 
 function downloadCaseImportTemplate() {
@@ -353,13 +416,13 @@ async function loadCaseImportFile(event) {
   const file = event.target.files?.[0];
   if (!file) return;
   $('caseImportJson').value = await file.text();
-  $('importMsg').textContent = `Archivo cargado: ${file.name}`;
+  setStatus('importMsg', `Archivo cargado: ${file.name}`, 'success');
 }
 
 async function importCases() {
   try {
     const raw = $('caseImportJson').value.trim();
-    if (!raw) { alert('Pega o carga una plantilla de importacion'); return; }
+    if (!raw) { setStatus('importMsg', 'Pega una plantilla o carga un archivo antes de importar.', 'error'); return; }
     let imported;
     if (raw.startsWith('{') || raw.startsWith('[')) {
       imported = await api('/api/cases/import', { method: 'POST', body: JSON.stringify(JSON.parse(raw)) });
@@ -372,19 +435,25 @@ async function importCases() {
       if (!r.ok) throw new Error(await r.text());
       imported = await r.json();
     }
-    $('importMsg').textContent = `Importados: ${imported.map(c => `#${c.caseId} ${c.title} (${c.blocks} bloques)`).join(', ')}`;
+    setStatus('importMsg', `Importados: ${imported.map(c => `#${c.caseId} ${c.title} (${c.blocks} bloques)`).join(', ')}`, 'success');
     $('caseImportJson').value = '';
   } catch (e) {
-    $('importMsg').textContent = e.message;
+    setStatus('importMsg', naturalError(e), 'error');
   }
 }
 
 async function assignStudents(id) {
-  const selected = [...$('assign' + id).selectedOptions].map(o => Number(o.value));
-  if (!selected.length) { alert('Selecciona al menos un estudiante'); return; }
+  const selected = [...document.querySelectorAll(`#assign${id} input[type="checkbox"]:checked`)].map(o => Number(o.value));
+  if (!selected.length) { setStatus('assignMsg' + id, 'Selecciona al menos un estudiante para asignar el caso.', 'error'); return; }
   const maxAttempts = Math.max(1, Number($('attempts' + id)?.value || 1));
-  const assigned = await api(`/api/cases/${id}/assign-students`, { method: 'POST', body: JSON.stringify({ studentIds: selected, maxAttempts }) });
-  alert(`Asignado a ${assigned.length} estudiante(s)`);
+  try {
+    const assigned = await api(`/api/cases/${id}/assign-students`, { method: 'POST', body: JSON.stringify({ studentIds: selected, maxAttempts }) });
+    const reused = assigned.filter(a => a.alreadyAssigned).length;
+    const created = assigned.length - reused;
+    setStatus('assignMsg' + id, `Asignacion lista. Nuevos: ${created}. Ya estaban asignados: ${reused}.`, 'success');
+  } catch (e) {
+    setStatus('assignMsg' + id, naturalError(e), 'error');
+  }
 }
 
 async function openBuilder(caseId) {
@@ -406,9 +475,25 @@ function blockActions(b, caseId, index, total) {
 function blockCard(b, caseId, index, total) {
   if (b.blockType === 'QUESTION') {
     const opts = (b.question?.options || []).map(o => `<li>${o.correct ? '<b>[correcta]</b> ' : ''}${o.text}</li>`).join('');
-    return `<div class="block-card" id="block${b.id}"><span class=badge>Pantalla ${b.orderIndex}: Pregunta</span>${blockActions(b, caseId, index, total)}<h4>${b.question?.text || b.title}</h4><ol>${opts}</ol></div>`;
+    return `<div class="block-card" id="block${b.id}"><span class=badge>Pantalla ${b.orderIndex}: Pregunta ${questionModeLabel(b.question?.responseMode)}</span>${blockActions(b, caseId, index, total)}<h4>${b.question?.text || b.title}</h4><ol>${opts}</ol></div>`;
   }
   return `<div class="block-card" id="block${b.id}"><span class=badge>Pantalla ${b.orderIndex}: Cuadro de texto</span>${blockActions(b, caseId, index, total)}<h4>${b.title}</h4><p>${b.contextText || ''}</p></div>`;
+}
+
+function questionModeLabel(mode) {
+  return questionResponseMode(mode) === 'SINGLE' ? 'unica' : 'multiple';
+}
+
+function questionResponseMode(mode) {
+  return String(mode || 'MULTIPLE').toUpperCase() === 'SINGLE' ? 'SINGLE' : 'MULTIPLE';
+}
+
+function validateQuestionDraft(options, responseMode, statusId) {
+  if (options.length < 3 || options.length > 4) { setStatus(statusId, 'Cada pregunta debe tener entre 3 y 4 opciones.', 'error'); return false; }
+  const correctCount = options.filter(o => o.correct).length;
+  if (responseMode === 'SINGLE' && correctCount !== 1) { setStatus(statusId, 'Las preguntas de respuesta unica deben tener exactamente una opcion correcta.', 'error'); return false; }
+  if (responseMode === 'MULTIPLE' && correctCount < 1) { setStatus(statusId, 'Marca al menos una opcion correcta.', 'error'); return false; }
+  return true;
 }
 
 function addBlockCard(caseId, orderIndex) {
@@ -440,12 +525,18 @@ function renderQuestionBlockForm(caseId, orderIndex) {
   $('addBlock').innerHTML = `<h4>Nueva pregunta cerrada</h4>
     <label class="field-label">Pregunta</label>
     <textarea id="questionText" class="question-input" placeholder="Escribe aquí la pregunta que responderá el estudiante"></textarea>
+    <label class="field-label">Tipo de respuesta</label>
+    <select id="questionResponseMode">
+      <option value="SINGLE">Unica respuesta</option>
+      <option value="MULTIPLE" selected>Multiple respuesta</option>
+    </select>
     <label class="field-label">Puntaje</label>
     <input id="questionScore" class="score-input" type="number" value="10" min="1" placeholder="Puntaje">
     <div class="options-editor">
       <label class="field-label">Opciones de respuesta</label>
       ${[1, 2, 3, 4].map(i => `<div class="option-row"><input id="opt${i}" placeholder="Opción ${i}${i === 4 ? ' opcional' : ''}"><label class="check-label"><input id="ok${i}" type="checkbox"> Correcta</label></div>`).join('')}
     </div>
+    ${statusBox('questionMsg')}
     <div class="form-actions"><button onclick="saveQuestionBlock(${caseId},${orderIndex})">Guardar pregunta</button></div>`;
 }
 
@@ -459,15 +550,19 @@ async function saveTextBlock(caseId, orderIndex) {
 
 async function saveQuestionBlock(caseId, orderIndex) {
   const questionText = $('questionText').value.trim();
-  if (!questionText) { alert('Escribe el texto de la pregunta'); return; }
+  if (!questionText) { setStatus('questionMsg', 'Escribe el texto de la pregunta.', 'error'); return; }
   const options = [1, 2, 3, 4].map(i => ({ text: $('opt' + i).value.trim(), correct: $('ok' + i).checked })).filter(o => o.text);
-  if (options.length < 3 || options.length > 4) { alert('Cada pregunta debe tener entre 3 y 4 opciones'); return; }
-  if (!options.some(o => o.correct)) { alert('Marca al menos una opción correcta'); return; }
-  await api(`/api/cases/${caseId}/blocks`, {
-    method: 'POST',
-    body: JSON.stringify({ blockType: 'QUESTION', orderIndex, title: 'Pregunta', questionText, score: Number($('questionScore').value || 10), options })
-  });
-  openBuilder(caseId);
+  const responseMode = questionResponseMode($('questionResponseMode').value);
+  if (!validateQuestionDraft(options, responseMode, 'questionMsg')) return;
+  try {
+    await api(`/api/cases/${caseId}/blocks`, {
+      method: 'POST',
+      body: JSON.stringify({ blockType: 'QUESTION', orderIndex, title: 'Pregunta', questionText, responseMode, score: Number($('questionScore').value || 10), options })
+    });
+    openBuilder(caseId);
+  } catch (e) {
+    setStatus('questionMsg', naturalError(e), 'error');
+  }
 }
 
 function renderEditBlockForm(caseId, blockId) {
@@ -483,9 +578,15 @@ function renderEditBlockForm(caseId, blockId) {
     target.innerHTML = `<h4>Editar pregunta</h4>
       <label class="field-label">Pregunta</label>
       <textarea id="editQuestionText" class="question-input">${esc(b.question?.text)}</textarea>
+      <label class="field-label">Tipo de respuesta</label>
+      <select id="editQuestionResponseMode">
+        <option value="SINGLE" ${questionResponseMode(b.question?.responseMode) === 'SINGLE' ? 'selected' : ''}>Unica respuesta</option>
+        <option value="MULTIPLE" ${questionResponseMode(b.question?.responseMode) === 'MULTIPLE' ? 'selected' : ''}>Multiple respuesta</option>
+      </select>
       <label class="field-label">Puntaje</label>
       <input id="editQuestionScore" class="score-input" type="number" value="${b.question?.score || 10}" min="1">
       <div class="options-editor"><label class="field-label">Opciones de respuesta</label>${optionInputs}</div>
+      ${statusBox(`editQuestionMsg${blockId}`)}
       <div class="form-actions"><button class="secondary-btn" onclick="openBuilder(${caseId})">Cancelar</button><button onclick="saveEditedQuestionBlock(${caseId},${blockId})">Guardar</button></div>`;
     return;
   }
@@ -512,15 +613,19 @@ async function saveEditedTextBlock(caseId, blockId) {
 
 async function saveEditedQuestionBlock(caseId, blockId) {
   const questionText = $('editQuestionText').value.trim();
-  if (!questionText) { alert('Escribe el texto de la pregunta'); return; }
+  if (!questionText) { setStatus('editQuestionMsg' + blockId, 'Escribe el texto de la pregunta.', 'error'); return; }
   const options = [1, 2, 3, 4].map(i => ({ text: $('editOpt' + i).value.trim(), correct: $('editOk' + i).checked })).filter(o => o.text);
-  if (options.length < 3 || options.length > 4) { alert('Cada pregunta debe tener entre 3 y 4 opciones'); return; }
-  if (!options.some(o => o.correct)) { alert('Marca al menos una opcion correcta'); return; }
-  await api(`/api/cases/blocks/${blockId}`, {
-    method: 'PUT',
-    body: JSON.stringify({ blockType: 'QUESTION', questionText, score: Number($('editQuestionScore').value || 10), options })
-  });
-  openBuilder(caseId);
+  const responseMode = questionResponseMode($('editQuestionResponseMode').value);
+  if (!validateQuestionDraft(options, responseMode, 'editQuestionMsg' + blockId)) return;
+  try {
+    await api(`/api/cases/blocks/${blockId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ blockType: 'QUESTION', questionText, responseMode, score: Number($('editQuestionScore').value || 10), options })
+    });
+    openBuilder(caseId);
+  } catch (e) {
+    setStatus('editQuestionMsg' + blockId, naturalError(e), 'error');
+  }
 }
 
 async function deleteBlock(caseId, blockId) {
@@ -626,7 +731,8 @@ function renderBlockPlayer(index) {
   const head = playerHeader(b, index, progress);
   const history = slideHistoryPanel(index);
   if (b.blockType === 'QUESTION') {
-    const opts = (b.question.options || []).map(o => `<label class="answer-option"><input type="checkbox" name="q${b.question.id}" value="${o.id}"> ${esc(o.text)}</label>`).join('');
+    const inputType = questionResponseMode(b.question.responseMode) === 'SINGLE' ? 'radio' : 'checkbox';
+    const opts = (b.question.options || []).map(o => `<label class="answer-option"><input type="${inputType}" name="q${b.question.id}" value="${o.id}"> ${esc(o.text)}</label>`).join('');
     show('Resolver caso', `<div class="player-shell vn-player">${head}${visualPlaceholder()}${history}<section class="vn-dialogue question-dialogue"><div class="dialogue-copy"><h4>${esc(b.question.text)}</h4><div class="answers-grid">${opts}</div></div></section>${nav}</div>`);
     return;
   }
@@ -647,11 +753,12 @@ async function nextBlock(index) {
     if (b.blockType === 'QUESTION') {
       const selected = [...document.querySelectorAll(`input[name="q${b.question.id}"]:checked`)].map(x => Number(x.value));
       if (!selected.length) { alert('Selecciona al menos una opcion'); return; }
+      if (questionResponseMode(b.question.responseMode) === 'SINGLE' && selected.length !== 1) { alert('Selecciona una sola opcion'); return; }
       await api(`/api/student/assignments/${activeAssignment}/answer-multiple`, { method: 'POST', body: JSON.stringify({ questionId: b.question.id, optionIds: selected }) });
     }
     renderBlockPlayer(index + 1);
   } catch (e) {
-    show('Sesion en vivo', `<p class="error-text">No se pudo guardar la respuesta.</p><pre>${esc(e.message)}</pre>`);
+    show('Sesion en vivo', `<div class="feedback error">No se pudo guardar la respuesta. ${esc(naturalError(e))}</div>`);
   }
 }
 async function saveDraft(id, notify = true) {
@@ -666,7 +773,7 @@ async function finishAssignment() {
     const submitted = await api(`/api/student/assignments/${activeAssignment}/submit`, { method: 'POST', body: JSON.stringify({}) });
     showScoreResult(submitted.autoScore, submitted.attemptNumber, 'Entrega enviada');
   } catch (e) {
-    show('Sesion en vivo', `<p class="error-text">No se pudo enviar la entrega.</p><pre>${esc(e.message)}</pre>`);
+    show('Sesion en vivo', `<div class="feedback error">No se pudo enviar la entrega. ${esc(naturalError(e))}</div>`);
   }
 }
 
@@ -734,7 +841,7 @@ async function loadRankingForCase(caseId = Number($('rankingCaseId')?.value || 0
     const rows = await api(`/api/game/ranking?caseId=${caseId}`);
     target.innerHTML = rows.map((r, i) => `<div class=item>${i + 1}. <b>${esc(r.estudiante)}</b>: ${r.puntaje} pts ${r.nota ?? ''}</div>`).join('') || 'Sin ranking para este caso';
   } catch (e) {
-    target.innerHTML = `<p class="error-text">No se pudo cargar el ranking de este caso.</p><pre>${esc(e.message)}</pre>`;
+    target.innerHTML = `<div class="feedback error">No se pudo cargar el ranking de este caso. ${esc(naturalError(e))}</div>`;
   }
 }
 
@@ -743,17 +850,21 @@ async function createSession() {
   const durationMinutes = Number($('sessionDuration').value || 30);
   if ($('hostSessionOut')) $('hostSessionOut').innerHTML = '';
   if (!caseId) {
-    $('pinOut').textContent = 'Selecciona un caso para generar el PIN.';
+    setStatus('pinOut', 'Selecciona un caso para generar el PIN.', 'error');
     return;
   }
   if (!durationMinutes || durationMinutes < 1) {
-    $('pinOut').textContent = 'Indica un limite de tiempo valido.';
+    setStatus('pinOut', 'Indica un limite de tiempo valido.', 'error');
     return;
   }
-  const r = await api('/api/game/sessions', { method: 'POST', body: JSON.stringify({ caseId, durationMinutes }) });
-  activeGameSession = r;
-  $('pinOut').textContent = `PIN: ${r.pin}\nEstado: esperando estudiantes\nTiempo: ${r.durationMinutes} minutos`;
-  renderHostSessionRoom(r);
+  try {
+    const r = await api('/api/game/sessions', { method: 'POST', body: JSON.stringify({ caseId, durationMinutes }) });
+    activeGameSession = r;
+    setStatus('pinOut', `PIN ${r.pin}. Sala en espera. Tiempo: ${r.durationMinutes} minutos.`, 'success');
+    renderHostSessionRoom(r);
+  } catch (e) {
+    setStatus('pinOut', naturalError(e), 'error');
+  }
 }
 
 function stopLiveSessionTimer() {
@@ -830,15 +941,15 @@ async function finishLiveSession(sessionId) {
 async function joinLiveSession() {
   const pin = $('joinPin').value.trim();
   if (!pin) {
-    $('joinOut').textContent = 'Ingresa el PIN.';
+    setStatus('joinOut', 'Ingresa el PIN de la sesion.', 'error');
     return;
   }
   try {
     const session = await api(`/api/game/join/${encodeURIComponent(pin)}`, { method: 'POST', body: JSON.stringify({}) });
-    $('joinOut').textContent = `Entraste a la sesion ${session.pin}`;
+    setStatus('joinOut', `Entraste a la sesion ${session.pin}.`, 'success');
     renderStudentSession(session);
   } catch (e) {
-    $('joinOut').textContent = e.message;
+    setStatus('joinOut', naturalError(e), 'error');
   }
 }
 
@@ -933,7 +1044,7 @@ function renderEditUser(id) {
       <button class="secondary-btn" onclick="loadUsers()">Cancelar</button>
       <button onclick="updateUser(${id})">Guardar cambios</button>
     </div>
-    <pre id="editUserMsg${id}"></pre>`;
+    ${statusBox(`editUserMsg${id}`)}`;
 }
 
 async function updateUser(id) {
@@ -948,7 +1059,7 @@ async function updateUser(id) {
     await api(`/api/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(body) });
     await loadUsers();
   } catch (e) {
-    $('editUserMsg' + id).textContent = e.message;
+    setStatus('editUserMsg' + id, naturalError(e), 'error');
   }
 }
 
@@ -960,15 +1071,15 @@ async function deleteUser(id) {
 }
 
 async function createUser() {
-  $('uMsg').textContent = '';
+  setStatus('uMsg', '');
   try {
     await api('/api/admin/users', { method: 'POST', body: JSON.stringify({ name: $('uName').value, email: $('uEmail').value, role: $('uRole').value, password: $('uPass').value }) });
     $('uName').value = '';
     $('uEmail').value = '';
     $('uPass').value = '123456';
-    $('uMsg').textContent = 'Usuario creado. Ve a Usuarios para editarlo o revisar la lista completa.';
+    setStatus('uMsg', 'Usuario creado. Ve a Usuarios para editarlo o revisar la lista completa.', 'success');
   } catch (e) {
-    $('uMsg').textContent = e.message;
+    setStatus('uMsg', naturalError(e), 'error');
   }
 }
 

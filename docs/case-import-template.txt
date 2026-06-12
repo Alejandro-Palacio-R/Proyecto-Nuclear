@@ -10,6 +10,7 @@ Lee la situacion y escribe que variables sociales identificas.
 
 ---
 PREGUNTA: Cual seria la primera accion profesional mas adecuada?
+TIPO: unica
 PUNTAJE: 10
 OPCIONES:
 - [correcta] Escuchar a las partes y recopilar informacion
@@ -18,6 +19,7 @@ OPCIONES:
 
 ---
 PREGUNTA: Que factores pueden explicar la conducta del grupo?
+TIPO: multiple
 PUNTAJE: 10
 OPCIONES:
 - [correcta] Conformidad

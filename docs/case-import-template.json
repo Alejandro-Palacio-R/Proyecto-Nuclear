@@ -15,6 +15,7 @@
           "type": "QUESTION",
           "title": "Decision inicial",
           "question": "Cual seria la primera accion profesional mas adecuada?",
+          "responseMode": "SINGLE",
           "score": 10,
           "options": [
             {
@@ -38,6 +39,7 @@
           "type": "QUESTION",
           "title": "Factores de influencia",
           "question": "Que factores pueden explicar la conducta del grupo?",
+          "responseMode": "MULTIPLE",
           "score": 10,
           "options": [
             {

@@ -131,13 +131,15 @@ public class CaseController {
 
     if (type.equals("QUESTION")) {
       List<Map<String, Object>> optionBodies = optionBodies(body.get("options"));
-      if (optionBodies.size() < 3 || optionBodies.size() > 4) throw new IllegalArgumentException("Cada pregunta debe tener entre 3 y 4 opciones");
+      String responseMode = responseMode(body.get("responseMode"));
+      validateQuestionOptions(optionBodies, responseMode);
 
       Question q = new Question();
       q.scenario = s;
       q.orderIndex = 1;
       q.score = intValue(body.get("score"), 10);
       q.text = String.valueOf(body.getOrDefault("questionText", s.title));
+      q.responseMode = responseMode;
       q = questions.save(q);
 
       for (Map<String, Object> optionBody : optionBodies) {
@@ -167,14 +169,15 @@ public class CaseController {
 
     if (type.equals("QUESTION")) {
       List<Map<String, Object>> optionBodies = mapList(body.get("options"));
+      Question q = questions.findByScenarioIdOrderByOrderIndexAsc(s.id).stream().findFirst().orElseThrow();
+      String responseMode = responseMode(body.getOrDefault("responseMode", q.responseMode));
       if (!optionBodies.isEmpty()) {
-        if (optionBodies.size() < 3 || optionBodies.size() > 4) throw new IllegalArgumentException("Cada pregunta debe tener entre 3 y 4 opciones");
-        if (optionBodies.stream().noneMatch(o -> boolValue(o.get("correct")))) throw new IllegalArgumentException("Cada pregunta debe tener al menos una opcion correcta");
+        validateQuestionOptions(optionBodies, responseMode);
       }
 
-      Question q = questions.findByScenarioIdOrderByOrderIndexAsc(s.id).stream().findFirst().orElseThrow();
       q.text = textValue(body.get("questionText"), q.text);
       q.score = intValue(body.get("score"), q.score);
+      q.responseMode = responseMode;
       questions.save(q);
 
       if (!optionBodies.isEmpty()) {
@@ -240,8 +243,8 @@ public class CaseController {
 
     if (type.equals("QUESTION")) {
       List<Map<String, Object>> optionBodies = mapList(body.get("options"));
-      if (optionBodies.size() < 3 || optionBodies.size() > 4) throw new IllegalArgumentException("Cada pregunta debe tener entre 3 y 4 opciones");
-      if (optionBodies.stream().noneMatch(o -> boolValue(o.get("correct")))) throw new IllegalArgumentException("Cada pregunta debe tener al menos una opcion correcta");
+      String responseMode = responseMode(body.get("responseMode"));
+      validateQuestionOptions(optionBodies, responseMode);
 
       Question q = new Question();
       q.scenario = s;
@@ -249,6 +252,7 @@ public class CaseController {
       q.score = intValue(body.get("score"), 10);
       q.text = textValue(body.getOrDefault("questionText", body.get("question")), s.title);
       if (q.text.isBlank()) throw new IllegalArgumentException("La pregunta no puede estar vacia");
+      q.responseMode = responseMode;
       q = questions.save(q);
 
       for (Map<String, Object> optionBody : optionBodies) {
@@ -306,9 +310,7 @@ public class CaseController {
     StudyGroup g = groups.findById(groupId).orElseThrow();
     List<Assignment> out = new ArrayList<>();
     for (User s : g.students) {
-      Assignment a = new Assignment();
-      a.caseStudy = cs; a.group = g; a.student = s;
-      out.add(assignments.save(a));
+      out.add(assignStudentToCase(cs, s, g, 1));
     }
     return out;
   }
@@ -322,12 +324,11 @@ public class CaseController {
     for (Long studentId : longList(body.get("studentIds"))) {
       User student = users.findById(studentId).orElseThrow();
       if (student.role != Role.ESTUDIANTE) throw new IllegalArgumentException("El usuario " + studentId + " no es estudiante");
-      Assignment a = new Assignment();
-      a.caseStudy = cs; a.student = student;
-      a.maxAttempts = maxAttempts;
-      Assignment saved = assignments.save(a);
+      boolean alreadyAssigned = !assignments.findByStudentIdAndCaseStudyId(student.id, cs.id).isEmpty();
+      Assignment saved = assignStudentToCase(cs, student, null, maxAttempts);
       Map<String, Object> m = studentDto(student);
       m.put("assignmentId", saved.id);
+      m.put("alreadyAssigned", alreadyAssigned);
       out.add(m);
     }
     return out;
@@ -336,9 +337,25 @@ public class CaseController {
   @PostMapping("/{id}/assign-student/{studentId}")
   @PreAuthorize("hasAnyRole('PROFESOR','ADMIN')")
   public Assignment assignStudent(@PathVariable Long id, @PathVariable Long studentId) {
+    CaseStudy cs = cases.findById(id).orElseThrow();
+    User student = users.findById(studentId).orElseThrow();
+    if (student.role != Role.ESTUDIANTE) throw new IllegalArgumentException("El usuario " + studentId + " no es estudiante");
+    return assignStudentToCase(cs, student, null, 1);
+  }
+
+  private Assignment assignStudentToCase(CaseStudy cs, User student, StudyGroup group, int maxAttempts) {
+    List<Assignment> existing = assignments.findByStudentIdAndCaseStudyId(student.id, cs.id);
+    if (!existing.isEmpty()) {
+      Assignment current = existing.get(0);
+      if (group != null && current.group == null) current.group = group;
+      current.maxAttempts = Math.max(Math.max(1, current.maxAttempts), Math.max(1, maxAttempts));
+      return assignments.save(current);
+    }
     Assignment a = new Assignment();
-    a.caseStudy = cases.findById(id).orElseThrow();
-    a.student = users.findById(studentId).orElseThrow();
+    a.caseStudy = cs;
+    a.student = student;
+    a.group = group;
+    a.maxAttempts = Math.max(1, maxAttempts);
     return assignments.save(a);
   }
 
@@ -351,6 +368,7 @@ public class CaseController {
       Question q = qs.get(0);
       Map<String, Object> qm = new LinkedHashMap<>();
       qm.put("id", q.id); qm.put("text", q.text); qm.put("score", q.score);
+      qm.put("responseMode", responseMode(q.responseMode));
       qm.put("options", options.findByQuestionIdOrderByIdAsc(q.id).stream().map(o -> {
         Map<String, Object> om = new LinkedHashMap<>();
         om.put("id", o.id); om.put("text", o.text); om.put("correct", o.correct); om.put("justification", o.justification);
@@ -440,10 +458,17 @@ public class CaseController {
         currentBlock.put("type", "QUESTION");
         currentBlock.put("title", "Pregunta");
         currentBlock.put("question", valueAfterColon(line));
+        currentBlock.put("responseMode", "MULTIPLE");
         currentBlock.put("score", 10);
         currentBlock.put("options", new ArrayList<Map<String, Object>>());
         blocksOf(currentCase).add(currentBlock);
         currentTextField = "question";
+        continue;
+      }
+      if (startsWithAny(normalized, "tipo:", "modo:", "respuesta:")) {
+        ensureQuestionBlock(currentBlock);
+        currentBlock.put("responseMode", responseMode(valueAfterColon(line)));
+        currentTextField = null;
         continue;
       }
       if (startsWithAny(normalized, "puntaje:", "puntos:", "valor:")) {
@@ -485,8 +510,7 @@ public class CaseController {
         if ("QUESTION".equals(block.get("type"))) {
           requiredText(block, "question");
           List<Map<String, Object>> opts = optionListOf(block);
-          if (opts.size() < 3 || opts.size() > 4) throw new IllegalArgumentException("Cada pregunta debe tener entre 3 y 4 opciones");
-          if (opts.stream().noneMatch(o -> boolValue(o.get("correct")))) throw new IllegalArgumentException("Cada pregunta debe tener al menos una opcion correcta");
+          validateQuestionOptions(opts, responseMode(block.get("responseMode")));
         }
       }
     }
@@ -564,6 +588,23 @@ public class CaseController {
   private boolean boolValue(Object value) {
     if (value instanceof Boolean b) return b;
     return value != null && Boolean.parseBoolean(value.toString());
+  }
+
+  private String responseMode(Object value) {
+    String mode = java.text.Normalizer.normalize(textValue(value, "MULTIPLE"), java.text.Normalizer.Form.NFD)
+      .replaceAll("\\p{M}", "")
+      .replaceAll("[\\s-]+", "_")
+      .toUpperCase(Locale.ROOT);
+    if (List.of("SINGLE", "UNICA", "UNICO", "UNICA_RESPUESTA").contains(mode)) return "SINGLE";
+    if (List.of("MULTIPLE", "MULTIPLE_RESPUESTA").contains(mode)) return "MULTIPLE";
+    throw new IllegalArgumentException("El tipo de respuesta debe ser unica o multiple");
+  }
+
+  private void validateQuestionOptions(List<Map<String, Object>> optionBodies, String responseMode) {
+    if (optionBodies.size() < 3 || optionBodies.size() > 4) throw new IllegalArgumentException("Cada pregunta debe tener entre 3 y 4 opciones");
+    long correctCount = optionBodies.stream().filter(o -> boolValue(o.get("correct"))).count();
+    if ("SINGLE".equals(responseMode) && correctCount != 1) throw new IllegalArgumentException("Las preguntas de respuesta unica deben tener exactamente una opcion correcta");
+    if ("MULTIPLE".equals(responseMode) && correctCount < 1) throw new IllegalArgumentException("Las preguntas de respuesta multiple deben tener al menos una opcion correcta");
   }
 
   private void requireCaseAccess(Long caseId) {
