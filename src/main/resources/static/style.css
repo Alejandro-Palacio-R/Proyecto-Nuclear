@@ -42,7 +42,7 @@ body:not(.auth-shell) main{max-width:none;padding:0}
 h1{font-size:34px;line-height:1.15;margin:8px 0 22px;color:var(--text);font-weight:800}
 h2,h3{color:var(--text);margin-top:0}
 p{color:var(--muted);line-height:1.55}
-.hidden{display:none}
+.hidden{display:none!important}
 
 .material-symbols-outlined{
   font-family:"Material Symbols Outlined";
